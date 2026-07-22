@@ -1,0 +1,86 @@
+package io.everyonecodes.project_module;
+
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
+
+import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.List;
+
+@Entity
+@Getter
+@Setter
+@AllArgsConstructor
+@NoArgsConstructor
+public class Artwork {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne
+    @OnDelete(action = OnDeleteAction.CASCADE)
+    private User artist;
+
+    @Column(columnDefinition = "TEXT", nullable = false)
+    private String title;
+
+    @Column(columnDefinition = "NUMERIC(12,2)", nullable = false)
+    private double price;
+
+    @Column(nullable = false)
+    private int year;
+
+    @Column(columnDefinition = "TEXT", nullable = false)
+    private String description;
+
+    @Column(columnDefinition = "TEXT", nullable = false)
+    private String city;
+
+    @Column(columnDefinition = "TEXT", nullable = false)
+    private String postcode;
+
+    @Column(name = "dim_x", columnDefinition = "NUMERIC(8,2) CHECK (dim_x > 0)", nullable = false)
+    private double dimX;
+
+    @Column(name = "dim_y", columnDefinition = "NUMERIC(8,2) CHECK (dim_y > 0)", nullable = false)
+    private double dimY;
+
+    @Column(name = "dim_z", columnDefinition = "NUMERIC(8,2) CHECK (dim_z > 0)")
+    private Double dimZ;
+
+    @Embedded
+    private Frame frame;
+
+    @ManyToOne
+    @OnDelete(action = OnDeleteAction.SET_NULL)
+    private Category category;
+
+    @ManyToOne
+    @OnDelete(action = OnDeleteAction.SET_NULL)
+    private Media media;
+
+    @ManyToOne
+    @OnDelete(action = OnDeleteAction.SET_NULL)
+    private Support support;
+
+    @Column(updatable = false)
+    @CreationTimestamp
+    private OffsetDateTime createdAt;
+
+    @Column
+    private OffsetDateTime deletedAt;
+
+    @Column
+    private OffsetDateTime soldAt;
+
+    @Column(columnDefinition = "BOOLEAN DEFAULT false")
+    private boolean reserved;
+
+    @OneToMany(mappedBy = "artwork", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("sortOrder ASC")
+    private List<ArtworkImage> images = new ArrayList<>();
+}
