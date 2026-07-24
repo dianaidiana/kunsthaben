@@ -194,13 +194,50 @@ This gives you the "Clean Code" of a separate table with the "Performance" and "
 
 ## 22.07: questions to ask:
 
-should dimensions be enclosed in their own class?
-should artwork also have a factory with validation (eg the dimensions should be positive in object layer too).
-all validations should be done in java layer AND dba layer?
-what is the N+1 problem??
-"The primary key class [for a composite key] must be serializable."
-By adding implements Serializable, you are just fulfilling a technical requirement of the JPA specification. It ensures
-that Hibernate can safely move your composite keys around in memory, caches, or across networks without breaking the
-object.
-Rule of thumb: Every time you create an @Embeddable class to be used as an @EmbeddedId, always add implements
-Serializable.
+- should dimensions be enclosed in their own class?
+- should artwork also have a factory with validation (eg the dimensions should be positive in object layer too).
+- all validations should be done in java layer AND dba layer?
+- what is the N+1 problem??
+- "The primary key class [for a composite key] must be serializable."
+  By adding implements Serializable, you are just fulfilling a technical requirement of the JPA specification. It
+  ensures
+  that Hibernate can safely move your composite keys around in memory, caches, or across networks without breaking the
+  object.
+  Rule of thumb: Every time you create an @Embeddable class to be used as an @EmbeddedId, always add implements
+  Serializable.
+
+## 24.07 how to handle controller exceptions
+
+```java
+
+@RestControllerAdvice
+public class ApiExceptionHandler {
+
+    @ExceptionHandler(NotFoundException.class)
+    public ResponseEntity<String> handleNotFoundException(NotFoundException e) {
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .body(e.getMessage());
+    }
+}
+```
+
+```java
+public class NotFoundException extends RuntimeException {
+    public NotFoundException(String message) {
+        super(message);
+    }
+}
+```
+
+- data.sql in resources is read authomatically by spring boot
+- this is important to add to the properties in order to do it AFTER hibernate creates the schema!
+
+```properties
+# this tells Spring Boot to run data.sql regardless of database type:
+spring.sql.init.mode=always
+#Setting this to true reorders things so Hibernate creates the schema first, then data.sql runs against the now-existing tables:
+spring.jpa.defer-datasource-initialization=true
+```
+
+- but: is it better to do a initDatabase?? it seems easier (as I could use the enums). ASK!
