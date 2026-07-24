@@ -47,14 +47,8 @@ public class Artwork {
     @Column(columnDefinition = "TEXT", nullable = false)
     private String postcode;
 
-    @Column(name = "dim_x", columnDefinition = "NUMERIC(8,2) CHECK (dim_x > 0)", nullable = false)
-    private double dimX;
-
-    @Column(name = "dim_y", columnDefinition = "NUMERIC(8,2) CHECK (dim_y > 0)", nullable = false)
-    private double dimY;
-
-    @Column(name = "dim_z", columnDefinition = "NUMERIC(8,2) CHECK (dim_z > 0)")
-    private Double dimZ;
+    @Embedded
+    private Dimensions dimensions;
 
     @Embedded
     private Frame frame;
