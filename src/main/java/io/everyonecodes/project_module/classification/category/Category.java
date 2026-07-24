@@ -1,16 +1,14 @@
-package io.everyonecodes.project_module;
+package io.everyonecodes.project_module.classification.category;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 
 @Entity
 @Getter
 @Setter
 @AllArgsConstructor
 @NoArgsConstructor
+@EqualsAndHashCode
 public class Category {
 
     @Id

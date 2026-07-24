@@ -1,5 +1,6 @@
-package io.everyonecodes.project_module;
+package io.everyonecodes.project_module.artworks;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -27,6 +28,7 @@ public class ArtworkImage {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "artwork_id", nullable = false)
     @OnDelete(action = OnDeleteAction.CASCADE)
+    @JsonIgnore
     private Artwork artwork;
 
     @Column(columnDefinition = "TEXT", nullable = false)

@@ -1,10 +1,8 @@
-package io.everyonecodes.project_module;
+package io.everyonecodes.project_module.classification.support;
 
+import io.everyonecodes.project_module.classification.category.Category;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 
@@ -13,6 +11,7 @@ import org.hibernate.annotations.OnDeleteAction;
 @Setter
 @AllArgsConstructor
 @NoArgsConstructor
+@EqualsAndHashCode
 public class Support {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

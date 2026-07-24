@@ -1,6 +1,6 @@
-package io.everyonecodes.project_module;
+package io.everyonecodes.project_module.favorites;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
+import io.everyonecodes.project_module.users.User;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;

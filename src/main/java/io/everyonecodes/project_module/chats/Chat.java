@@ -1,5 +1,7 @@
-package io.everyonecodes.project_module;
+package io.everyonecodes.project_module.chats;
 
+import io.everyonecodes.project_module.artworks.Artwork;
+import io.everyonecodes.project_module.users.User;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;

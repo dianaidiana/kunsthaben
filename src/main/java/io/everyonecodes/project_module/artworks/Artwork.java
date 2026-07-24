@@ -1,5 +1,9 @@
-package io.everyonecodes.project_module;
+package io.everyonecodes.project_module.artworks;
 
+import io.everyonecodes.project_module.classification.category.Category;
+import io.everyonecodes.project_module.classification.media.Media;
+import io.everyonecodes.project_module.classification.support.Support;
+import io.everyonecodes.project_module.users.User;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;

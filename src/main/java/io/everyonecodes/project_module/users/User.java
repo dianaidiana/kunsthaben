@@ -1,4 +1,4 @@
-package io.everyonecodes.project_module;
+package io.everyonecodes.project_module.users;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;

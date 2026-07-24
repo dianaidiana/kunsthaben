@@ -1,4 +1,4 @@
-package io.everyonecodes.project_module;
+package io.everyonecodes.project_module.artworks;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;
