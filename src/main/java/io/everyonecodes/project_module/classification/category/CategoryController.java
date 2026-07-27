@@ -1,5 +1,6 @@
 package io.everyonecodes.project_module.classification.category;
 
+import io.everyonecodes.project_module.exceptions.ErrorMessages;
 import io.everyonecodes.project_module.exceptions.NotFoundException;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -11,7 +12,6 @@ import java.util.List;
 public class CategoryController {
 
     private final CategoryService categoryService;
-    private final String NOT_FOUND_MESSAGE = "Category not found";
 
     public CategoryController(CategoryService categoryService) {
         this.categoryService = categoryService;
@@ -25,12 +25,12 @@ public class CategoryController {
     @GetMapping("/category/{id}")
     Category getById(@PathVariable Long id) {
         return categoryService.findById(id)
-                              .orElseThrow(() -> new NotFoundException(NOT_FOUND_MESSAGE));
+                              .orElseThrow(() -> new NotFoundException(ErrorMessages.CATEGORY_NOT_FOUND));
     }
 
     @GetMapping("/category/code/{code}")
     Category getByCode(@PathVariable String code) {
         return categoryService.findByCode(code)
-                              .orElseThrow(() -> new NotFoundException(NOT_FOUND_MESSAGE));
+                              .orElseThrow(() -> new NotFoundException(ErrorMessages.CATEGORY_NOT_FOUND));
     }
 }

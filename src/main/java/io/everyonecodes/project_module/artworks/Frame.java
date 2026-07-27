@@ -1,5 +1,6 @@
 package io.everyonecodes.project_module.artworks;
 
+import io.everyonecodes.project_module.exceptions.ErrorMessages;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;
 import lombok.AccessLevel;
@@ -28,7 +29,7 @@ public class Frame {
     // factories for framed or unframed
     public static Frame framed(double dimX, double dimY, Double dimZ) {
         if (dimX <= 0 || dimY <= 0 || (dimZ != null && dimZ <= 0)) {
-            throw new IllegalArgumentException("Frame dimensions must be positive");
+            throw new IllegalArgumentException(ErrorMessages.FRAME_DIMENSIONS_INVALID);
         }
         return new Frame(true, dimX, dimY, dimZ);
     }

@@ -1,5 +1,6 @@
 package io.everyonecodes.project_module.classification.support;
 
+import io.everyonecodes.project_module.exceptions.ErrorMessages;
 import io.everyonecodes.project_module.exceptions.NotFoundException;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -11,7 +12,6 @@ import java.util.List;
 public class SupportController {
 
     private final SupportService supportService;
-    private final String NOT_FOUND_MESSAGE = "Support not found";
 
     public SupportController(SupportService supportService) {
         this.supportService = supportService;
@@ -25,13 +25,13 @@ public class SupportController {
     @GetMapping("/support/{id}")
     Support getById(@PathVariable Long id) {
         return supportService.findById(id)
-                             .orElseThrow(() -> new NotFoundException(NOT_FOUND_MESSAGE));
+                             .orElseThrow(() -> new NotFoundException(ErrorMessages.SUPPORT_NOT_FOUND));
     }
 
     @GetMapping("/support/code/{code}")
     Support getByCode(@PathVariable String code) {
         return supportService.findByCode(code)
-                             .orElseThrow(() -> new NotFoundException(NOT_FOUND_MESSAGE));
+                             .orElseThrow(() -> new NotFoundException(ErrorMessages.SUPPORT_NOT_FOUND));
     }
 
     @GetMapping("/support/category/{categoryId}")

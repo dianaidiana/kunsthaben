@@ -1,5 +1,6 @@
 package io.everyonecodes.project_module.artworks;
 
+import io.everyonecodes.project_module.exceptions.ErrorMessages;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;
 import lombok.AccessLevel;
@@ -24,7 +25,7 @@ public class Dimensions {
 
     public static Dimensions of(double x, double y, Double z) {
         if (x <= 0 || y <= 0 || (z != null && z <= 0)) {
-            throw new IllegalArgumentException("Dimensions must be positive");
+            throw new IllegalArgumentException(ErrorMessages.DIMENSIONS_INVALID);
         }
         return new Dimensions(x, y, z);
     }
