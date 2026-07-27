@@ -16,6 +16,9 @@ public class UserUpdateRequest {
 //    @NotBlank(message = ErrorMessages.PASSWORD_REQUIRED)
 //    private String password;
 
+    @NotBlank(message = ErrorMessages.NAME_REQUIRED)
+    private String name;
+
     @URL(message = ErrorMessages.BANNER_URL_INVALID)
     private String bannerUrl;
 

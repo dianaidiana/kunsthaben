@@ -48,6 +48,7 @@ public class UserService {
         var user = repository.findById(id)
                              .orElseThrow(() -> new NotFoundException(ErrorMessages.USER_NOT_FOUND));
 
+        user.setName(request.getName());
         user.setCity(request.getCity());
         user.setPostcode(request.getPostcode());
         user.setAvatarUrl(request.getAvatarUrl());
