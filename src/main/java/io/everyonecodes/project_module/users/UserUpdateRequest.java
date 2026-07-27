@@ -2,12 +2,19 @@ package io.everyonecodes.project_module.users;
 
 import io.everyonecodes.project_module.exceptions.ErrorMessages;
 import jakarta.validation.constraints.NotBlank;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.Setter;
 import org.hibernate.validator.constraints.URL;
 
+@AllArgsConstructor
+@Getter
+@Setter
 public class UserUpdateRequest {
 
-    @NotBlank(message = ErrorMessages.PASSWORD_REQUIRED)
-    private String password;
+//    No password update for now
+//    @NotBlank(message = ErrorMessages.PASSWORD_REQUIRED)
+//    private String password;
 
     @URL(message = ErrorMessages.BANNER_URL_INVALID)
     private String bannerUrl;
