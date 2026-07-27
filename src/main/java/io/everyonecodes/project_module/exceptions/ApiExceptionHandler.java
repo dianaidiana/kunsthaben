@@ -19,6 +19,13 @@ public class ApiExceptionHandler {
                 .body(e.getMessage());
     }
 
+    @ExceptionHandler(ConflictException.class)
+    public ResponseEntity<String> handleConflictException(ConflictException e) {
+        return ResponseEntity
+                .status(HttpStatus.CONFLICT)
+                .body(e.getMessage());
+    }
+
     // Thrown by Spring MVC itself. It carries a BindingResult with one FieldError per failed constraint
     // (field name + the message from the annotation, e.g. @NotBlank(message = "...")).
     @ExceptionHandler(MethodArgumentNotValidException.class)
