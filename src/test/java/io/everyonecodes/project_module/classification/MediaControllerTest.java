@@ -1,8 +1,8 @@
 package io.everyonecodes.project_module.classification;
 
 import io.everyonecodes.project_module.classification.category.Category;
-import io.everyonecodes.project_module.classification.enums.CategoryCode;
-import io.everyonecodes.project_module.classification.enums.MediaCode;
+import io.everyonecodes.project_module.classification.enums.CategoryEnum;
+import io.everyonecodes.project_module.classification.enums.MediaEnum;
 import io.everyonecodes.project_module.classification.media.Media;
 import io.everyonecodes.project_module.classification.media.MediaController;
 import io.everyonecodes.project_module.classification.media.MediaService;
@@ -33,14 +33,14 @@ public class MediaControllerTest {
     @Autowired
     RestTestClient client;
 
-    private final Category paintingCategory = new Category(1L, "Painting", CategoryCode.PAINTING.getCode());
+    private final Category paintingCategory = new Category(1L, CategoryEnum.PAINTING.getName(), CategoryEnum.PAINTING.getCode());
 
     @Test
     void getAll() {
         var expected = List.of(
-                new Media(1L, "Oil", MediaCode.OIL.getCode(), paintingCategory),
-                new Media(2L, "Acrylic", MediaCode.ACRYLIC.getCode(), paintingCategory),
-                new Media(3L, "Watercolor", MediaCode.WATERCOLOR.getCode(), paintingCategory)
+                new Media(1L, MediaEnum.OIL.getName(), MediaEnum.OIL.getCode(), paintingCategory),
+                new Media(2L, MediaEnum.ACRYLIC.getName(), MediaEnum.ACRYLIC.getCode(), paintingCategory),
+                new Media(3L, MediaEnum.WATERCOLOR.getName(), MediaEnum.WATERCOLOR.getCode(), paintingCategory)
         );
         when(service.findAll()).thenReturn(expected);
         List<Media> response = client.get()
@@ -56,7 +56,7 @@ public class MediaControllerTest {
 
     @Test
     void getByExistentId() {
-        var expected = new Media(1L, "Oil", MediaCode.OIL.getCode(), paintingCategory);
+        var expected = new Media(1L, MediaEnum.OIL.getName(), MediaEnum.OIL.getCode(), paintingCategory);
         when(service.findById(1L)).thenReturn(Optional.of(expected));
         Media response = client.get()
                                .uri("/media/1")
@@ -79,10 +79,10 @@ public class MediaControllerTest {
 
     @Test
     void getByExistentCode() {
-        var expected = new Media(1L, "Oil", MediaCode.OIL.getCode(), paintingCategory);
-        when(service.findByCode(MediaCode.OIL.getCode())).thenReturn(Optional.of(expected));
+        var expected = new Media(1L, MediaEnum.OIL.getName(), MediaEnum.OIL.getCode(), paintingCategory);
+        when(service.findByCode(MediaEnum.OIL.getCode())).thenReturn(Optional.of(expected));
         Media response = client.get()
-                               .uri("/media/code/" + MediaCode.OIL.getCode())
+                               .uri("/media/code/" + MediaEnum.OIL.getCode())
                                .exchange()
                                .expectStatus().isOk()
                                .expectBody(new ParameterizedTypeReference<Media>() {
@@ -103,8 +103,8 @@ public class MediaControllerTest {
     @Test
     void getByCategory() {
         var expected = List.of(
-                new Media(1L, "Oil", MediaCode.OIL.getCode(), paintingCategory),
-                new Media(2L, "Acrylic", MediaCode.ACRYLIC.getCode(), paintingCategory)
+                new Media(1L, MediaEnum.OIL.getName(), MediaEnum.OIL.getCode(), paintingCategory),
+                new Media(2L, MediaEnum.ACRYLIC.getName(), MediaEnum.ACRYLIC.getCode(), paintingCategory)
         );
         when(service.findByCategoryId(1L)).thenReturn(expected);
         List<Media> response = client.get()

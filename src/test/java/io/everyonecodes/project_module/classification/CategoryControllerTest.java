@@ -3,7 +3,7 @@ package io.everyonecodes.project_module.classification;
 import io.everyonecodes.project_module.classification.category.Category;
 import io.everyonecodes.project_module.classification.category.CategoryController;
 import io.everyonecodes.project_module.classification.category.CategoryService;
-import io.everyonecodes.project_module.classification.enums.CategoryCode;
+import io.everyonecodes.project_module.classification.enums.CategoryEnum;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureRestTestClient;
@@ -34,8 +34,8 @@ public class CategoryControllerTest {
     @Test
     void getAll() {
         var expected = List.of(
-                new Category(1L, "Painting", CategoryCode.PAINTING.getCode()),
-                new Category(2L, "Drawing", CategoryCode.DRAWING.getCode())
+                new Category(1L, CategoryEnum.PAINTING.getName(), CategoryEnum.PAINTING.getCode()),
+                new Category(2L, CategoryEnum.DRAWING.getName(), CategoryEnum.DRAWING.getCode())
         );
         when(service.findAll()).thenReturn(expected);
         List<Category> response = client.get()
@@ -51,7 +51,7 @@ public class CategoryControllerTest {
 
     @Test
     void getByExistentId() {
-        var expected = new Category(1L, "Painting", CategoryCode.PAINTING.getCode());
+        var expected = new Category(1L, CategoryEnum.PAINTING.getName(), CategoryEnum.PAINTING.getCode());
         when(service.findById(1L)).thenReturn(Optional.of(expected));
         Category response = client.get()
                                   .uri("/category/1")
@@ -74,10 +74,10 @@ public class CategoryControllerTest {
 
     @Test
     void getByExistentCode() {
-        var expected = new Category(1L, "Painting", CategoryCode.PAINTING.getCode());
-        when(service.findByCode(CategoryCode.PAINTING.getCode())).thenReturn(Optional.of(expected));
+        var expected = new Category(1L, CategoryEnum.PAINTING.getName(), CategoryEnum.PAINTING.getCode());
+        when(service.findByCode(CategoryEnum.PAINTING.getCode())).thenReturn(Optional.of(expected));
         Category response = client.get()
-                                  .uri("/category/code/" + CategoryCode.PAINTING.getCode())
+                                  .uri("/category/code/" + CategoryEnum.PAINTING.getCode())
                                   .exchange()
                                   .expectStatus().isOk()
                                   .expectBody(new ParameterizedTypeReference<Category>() {

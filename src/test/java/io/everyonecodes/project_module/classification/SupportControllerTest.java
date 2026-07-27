@@ -1,8 +1,8 @@
 package io.everyonecodes.project_module.classification;
 
 import io.everyonecodes.project_module.classification.category.Category;
-import io.everyonecodes.project_module.classification.enums.CategoryCode;
-import io.everyonecodes.project_module.classification.enums.SupportCode;
+import io.everyonecodes.project_module.classification.enums.CategoryEnum;
+import io.everyonecodes.project_module.classification.enums.SupportEnum;
 import io.everyonecodes.project_module.classification.support.Support;
 import io.everyonecodes.project_module.classification.support.SupportController;
 import io.everyonecodes.project_module.classification.support.SupportService;
@@ -33,14 +33,14 @@ public class SupportControllerTest {
     @Autowired
     RestTestClient client;
 
-    private final Category paintingCategory = new Category(1L, "Painting", CategoryCode.PAINTING.getCode());
+    private final Category paintingCategory = new Category(1L, CategoryEnum.PAINTING.getName(), CategoryEnum.PAINTING.getCode());
 
     @Test
     void getAll() {
         var expected = List.of(
-                new Support(1L, "Canvas", SupportCode.CANVAS.getCode(), paintingCategory),
-                new Support(2L, "Wood Panel", SupportCode.WOOD_PANEL.getCode(), paintingCategory),
-                new Support(3L, "Linen", SupportCode.LINEN.getCode(), paintingCategory)
+                new Support(1L, SupportEnum.CANVAS.getName(), SupportEnum.CANVAS.getCode(), paintingCategory),
+                new Support(2L, SupportEnum.WOOD_PANEL.getName(), SupportEnum.WOOD_PANEL.getCode(), paintingCategory),
+                new Support(3L, SupportEnum.LINEN.getName(), SupportEnum.LINEN.getCode(), paintingCategory)
         );
         when(service.findAll()).thenReturn(expected);
         List<Support> response = client.get()
@@ -56,7 +56,7 @@ public class SupportControllerTest {
 
     @Test
     void getByExistentId() {
-        var expected = new Support(1L, "Canvas", SupportCode.CANVAS.getCode(), paintingCategory);
+        var expected = new Support(1L, SupportEnum.CANVAS.getName(), SupportEnum.CANVAS.getCode(), paintingCategory);
         when(service.findById(1L)).thenReturn(Optional.of(expected));
         Support response = client.get()
                                  .uri("/support/1")
@@ -79,10 +79,10 @@ public class SupportControllerTest {
 
     @Test
     void getByExistentCode() {
-        var expected = new Support(1L, "Canvas", SupportCode.CANVAS.getCode(), paintingCategory);
-        when(service.findByCode(SupportCode.CANVAS.getCode())).thenReturn(Optional.of(expected));
+        var expected = new Support(1L, SupportEnum.CANVAS.getName(), SupportEnum.CANVAS.getCode(), paintingCategory);
+        when(service.findByCode(SupportEnum.CANVAS.getCode())).thenReturn(Optional.of(expected));
         Support response = client.get()
-                                 .uri("/support/code/" + SupportCode.CANVAS.getCode())
+                                 .uri("/support/code/" + SupportEnum.CANVAS.getCode())
                                  .exchange()
                                  .expectStatus().isOk()
                                  .expectBody(new ParameterizedTypeReference<Support>() {
@@ -103,8 +103,8 @@ public class SupportControllerTest {
     @Test
     void getByCategory() {
         var expected = List.of(
-                new Support(1L, "Canvas", SupportCode.CANVAS.getCode(), paintingCategory),
-                new Support(2L, "Wood Panel", SupportCode.WOOD_PANEL.getCode(), paintingCategory)
+                new Support(1L, SupportEnum.CANVAS.getName(), SupportEnum.CANVAS.getCode(), paintingCategory),
+                new Support(2L, SupportEnum.WOOD_PANEL.getName(), SupportEnum.WOOD_PANEL.getCode(), paintingCategory)
         );
         when(service.findByCategoryId(1L)).thenReturn(expected);
         List<Support> response = client.get()
