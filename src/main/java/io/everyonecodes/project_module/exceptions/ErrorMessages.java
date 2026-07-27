@@ -8,6 +8,9 @@ public final class ErrorMessages {
     public static final String CATEGORY_NOT_FOUND = "Category not found";
     public static final String MEDIA_NOT_FOUND = "Media not found";
     public static final String SUPPORT_NOT_FOUND = "Support not found";
+    public static final String USER_NOT_FOUND = "User not found";
+
+    public static final String EMAIL_ALREADY_TAKEN = "email is already taken";
 
     public static final String NAME_REQUIRED = "name should not be empty";
     public static final String CODE_REQUIRED = "code should not be empty";
