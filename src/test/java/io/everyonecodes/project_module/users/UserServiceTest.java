@@ -84,4 +84,41 @@ class UserServiceTest {
         assertThrows(NotFoundException.class, () -> service.update(1L, userUpdateRequest));
     }
 
+    @Test
+    void getByExistentId() {
+        var user = new User(1L, "Bob Ross", "bob@ross.com", "hashhashhash", null, null, "Vienna", "1020", null, createdAt);
+        when(repository.findById(eq(1L))).thenReturn(Optional.of(user));
+
+        var expectedResponse = new UserResponse(user.getId(), user.getName(), user.getEmail(),
+                user.getBannerUrl(), user.getAvatarUrl(), user.getCity(), user.getPostcode(),
+                user.getAbout(), user.getCreatedAt());
+
+        assertEquals(Optional.of(expectedResponse), service.getById(1L));
+    }
+
+    @Test
+    void getByUnexistentId() {
+        when(repository.findById(eq(1L))).thenReturn(Optional.empty());
+
+        assertEquals(Optional.empty(), service.getById(1L));
+    }
+
+    @Test
+    void deleteExistentUser() {
+        var user = new User(1L, "Bob Ross", "bob@ross.com", "hashhashhash", null, null, "Vienna", "1020", null, createdAt);
+        when(repository.findById(eq(1L))).thenReturn(Optional.of(user));
+
+        service.delete(1L);
+
+        verify(repository).delete(user);
+    }
+
+    @Test
+    void deleteUnexistentUser() {
+        when(repository.findById(eq(1L))).thenReturn(Optional.empty());
+
+        assertThrows(NotFoundException.class, () -> service.delete(1L));
+        verify(repository, never()).delete(any());
+    }
+
 }
