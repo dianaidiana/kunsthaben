@@ -3,6 +3,7 @@ package io.everyonecodes.project_module.users;
 import io.everyonecodes.project_module.exceptions.ErrorMessages;
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.validator.constraints.URL;
@@ -10,6 +11,7 @@ import org.hibernate.validator.constraints.URL;
 @AllArgsConstructor
 @Getter
 @Setter
+@EqualsAndHashCode
 public class UserUpdateRequest {
 
 //    No password update for now

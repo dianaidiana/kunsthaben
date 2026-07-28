@@ -4,7 +4,6 @@ import io.everyonecodes.project_module.exceptions.ConflictException;
 import io.everyonecodes.project_module.exceptions.ErrorMessages;
 import io.everyonecodes.project_module.exceptions.NotFoundException;
 import jakarta.transaction.Transactional;
-import org.springframework.boot.webmvc.autoconfigure.WebMvcProperties;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 

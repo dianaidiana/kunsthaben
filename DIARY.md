@@ -210,3 +210,55 @@ public class NotFoundException extends RuntimeException {
 ```
 
 [//]: # (### what is the N+1 problem??)
+Option A — fetch, mutate, explicit
+save():
+
+```java
+public UserResponse update(Long id, UserUpdateRequest
+        request) {
+    var user = repository.findById(
+                                 id)
+                         .orElseThrow(() -> new NotFoundException(ErrorMessages.USER_NOT_FOUND));
+
+    user.setCity(request.getCity());
+    user.setPostcode(request.getPostcode());
+    user.setBannerUrl(request.getBannerUrl());
+    user.setAvatarUrl(request.getAvatarUrl());
+    user.setAbout(request.getAbout());
+
+    var savedUser = repository.save(user);
+    return new UserResponse(savedUser.getId(), savedUser.getName(), savedUser.getEmail(),
+            savedUser.getBannerUrl(), savedUser.getAvatarUrl(), savedUser.getCity(),
+            savedUser.getPostcode(), savedUser.getAbout(), savedUser.getCreatedAt());
+
+}
+```
+
+Option B — @Transactional, no explicit save() at all:
+
+```java
+
+@Transactional
+public UserResponse update(Long id, UserUpdateRequest request) {
+    var user = repository.findById(id)
+                         .orElseThrow(() -> new NotFoundException(ErrorMessages.USER_NOT_FOUND));
+
+    user.setCity(request.getCity());
+    user.setPostcode(request.getPostcode());
+    // ... same setters, no repository.save(user) call needed                                                                                                                                                                    
+
+    return new UserResponse(/* ... */);
+}
+```
+
+Why option B works without calling save(): this is exactly what @Transactional is for, and it's genuinely worth
+understanding rather than treating as magic. Without @Transactional on the service method, each individual       
+repository call (findById) runs in its own short-lived transaction managed internally by Spring Data — by the time it
+returns, that transaction (and the Hibernate session backing it) has already closed, so the User object you
+get back is detached: nothing is watching it anymore, and mutating its fields afterward does nothing until you
+explicitly save() it again (that's Option A).
+
+With @Transactional on the whole method, one single transaction spans the entire method body — findById returns a
+managed entity that Hibernate is actively tracking for the duration. Any field you mutate on it is             
+automatically detected ("dirty checking"), and Hibernate issues the UPDATE on its own when the transaction commits at
+the end of the method — no save() call needed at all.

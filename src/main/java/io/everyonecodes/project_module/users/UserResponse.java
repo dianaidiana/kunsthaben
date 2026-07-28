@@ -5,6 +5,7 @@ import jakarta.persistence.Column;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
@@ -15,6 +16,7 @@ import java.time.OffsetDateTime;
 @AllArgsConstructor
 @Getter
 @Setter
+@EqualsAndHashCode
 public class UserResponse {
 
     private Long id;

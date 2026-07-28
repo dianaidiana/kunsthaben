@@ -4,12 +4,14 @@ import io.everyonecodes.project_module.exceptions.ErrorMessages;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
 
 @AllArgsConstructor
 @Getter
 @Setter
+@EqualsAndHashCode
 public class UserRegisterRequest {
 
     @NotBlank(message = ErrorMessages.NAME_REQUIRED)
