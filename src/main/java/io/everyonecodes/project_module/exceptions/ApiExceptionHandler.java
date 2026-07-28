@@ -26,6 +26,13 @@ public class ApiExceptionHandler {
                 .body(e.getMessage());
     }
 
+    @ExceptionHandler(BadRequestException.class)
+    public ResponseEntity<String> handleBadRequestException(BadRequestException e) {
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(e.getMessage());
+    }
+
     // Thrown by Spring MVC itself. It carries a BindingResult with one FieldError per failed constraint
     // (field name + the message from the annotation, e.g. @NotBlank(message = "...")).
     @ExceptionHandler(MethodArgumentNotValidException.class)
