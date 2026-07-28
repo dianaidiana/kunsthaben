@@ -1,4 +1,4 @@
-package io.everyonecodes.project_module.favorites;
+package io.everyonecodes.project_module.favorites.favoriteArtwork;
 
 import jakarta.persistence.Embeddable;
 import lombok.AllArgsConstructor;
@@ -11,7 +11,7 @@ import java.io.Serializable;
 @EqualsAndHashCode
 @AllArgsConstructor
 @NoArgsConstructor
-public class UserFavoriteArtistId implements Serializable {
+public class UserFavoriteArtworkId implements Serializable {
     private Long userId;
-    private Long artistId;
+    private Long artworkId;
 }
