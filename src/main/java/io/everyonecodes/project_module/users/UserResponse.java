@@ -36,4 +36,10 @@ public class UserResponse {
     private String about;
 
     private OffsetDateTime createdAt;
+
+    public static UserResponse from(User user) {
+        return new UserResponse(user.getId(), user.getName(), user.getEmail(),
+                user.getBannerUrl(), user.getAvatarUrl(), user.getCity(),
+                user.getPostcode(), user.getAbout(), user.getCreatedAt());
+    }
 }
