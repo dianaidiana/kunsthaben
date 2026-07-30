@@ -136,12 +136,17 @@ public static Frame unframed() {
 }
 ```
 
-## 22.07: Validation and composite keys
+## 22.07: More on making illegal states irrepresentable and Composite keys
 
-### Validate in DB AND in Java level
+### Make Java object instances valid
 
-The same as happened with Frame I should do it with the dimensions of the artwork, so that I can't create an artwork
-with negative dimensions, even though I already had a CHECK constraint at db layer.
+The same as I did with Frame I should do it with the dimensions of the artwork, so that I can't create an artwork
+with negative dimensions, even though I already had a CHECK constraint at db layer. There's a real window between
+construction and the eventual save where an Artwork with a negative dimension is a perfectly valid Java object that any
+code can read, pass around, or compute with. The bug only surfaces if and when something happens to persist it, which
+might be much
+later, in a different method, possibly never (if this Artwork is only ever used in memory for some calculation and never
+saved).
 
 That's why I created an Dimensions class which I also embed in Artwork and has a factory that validates the integrity of
 the dimensions:
@@ -167,25 +172,15 @@ public class Dimensions {
 }
 ```
 
-The general rule is: any group of fields guarded by a CHECK constraint that expresses a positivity/consistency invariant
-is a candidate for a small      
-validating @Embeddable value object. Where it doesn't apply: things like Media/Support codes or Chat's buyer_id <>
-seller_id check, those are either simple single-column constraints already fully enforced by the DB, or      
-relational checks across separate entities that don't naturally collapse into one embeddable value object. Don't reach
-for this pattern everywhere — it earns its keep specifically when a CHECK constraint is describing "these
-2–4 fields together form one coherent, occasionally-invalid concept," which is true of both Frame and Dimensions, but
-wouldn't be true of, say, title/price (each independently valid, no cross-field relationship).
-
 ### The primary key class [for a composite key] must be serializable.
 
 By adding implements Serializable, you are just fulfilling a technical requirement of the JPA specification. It
-ensures
-that Hibernate can safely move your composite keys around in memory, caches, or across networks without breaking the
-object.
-Rule of thumb: Every time you create an @Embeddable class to be used as an @EmbeddedId, always add implements
+ensures that Hibernate can safely move your composite keys around in memory, caches, or across networks without breaking
+the
+object. Rule of thumb: Every time you create an @Embeddable class to be used as an @EmbeddedId, always add implements
 Serializable.
 
-## 24.07 how to handle exceptions in the controller
+## 24.07 How to handle exceptions of the API
 
 ```java
 
@@ -209,9 +204,134 @@ public class NotFoundException extends RuntimeException {
 }
 ```
 
-[//]: # (### what is the N+1 problem??)
-Option A — fetch, mutate, explicit
-save():
+Exception propagation mechanics: nothing "catches" an exception in your controller/service, it's ordinary Java stack
+unwinding (only possible because every exception  
+here is unchecked) all the way out of your code, and only then does Spring's DispatcherServlet catch it and dispatch to
+a matching @ExceptionHandler.
+
+## 27.07 DTOs and validation
+
+### What is a DTO
+
+A DTO (Data Transfer Object) is a plain class that defines exactly what an HTTP request or response body must
+contain, separate from the `@Entity` class. The
+A DTO is needed when an entity has a sensitive field, a bidirectional
+relationship that risks Jackson recursion, needs more than one response shape, or is a join-table
+entity (in which case I reuse the *other side's* DTO instead of inventing a new one).
+
+For example in the case `users` case:
+
+```java
+public class UserRegisterRequest {
+
+    @NotBlank(message = ErrorMessages.NAME_REQUIRED)
+    private final String name;
+
+    @Email(message = ErrorMessages.EMAIL_INVALID)
+    private final String email;
+
+    @NotBlank(message = ErrorMessages.PASSWORD_REQUIRED)
+    private String password;
+
+    @NotBlank(message = ErrorMessages.CITY_REQUIRED)
+    private String city;
+
+    @NotBlank(message = ErrorMessages.POSTCODE_REQUIRED)
+    private String postcode;
+}
+```
+
+```java
+public class UserUpdateRequest {
+
+    @NotBlank(message = ErrorMessages.NAME_REQUIRED)
+    private String name;
+
+    @URL(message = ErrorMessages.BANNER_URL_INVALID)
+    private String bannerUrl;
+
+    @URL(message = ErrorMessages.AVATAR_URL_INVALID)
+    private String avatarUrl;
+
+    @NotBlank(message = ErrorMessages.CITY_REQUIRED)
+    private String city;
+
+    @NotBlank(message = ErrorMessages.POSTCODE_REQUIRED)
+    private String postcode;
+
+    private String about;
+}
+```
+
+```java
+public class UserResponse {
+    private Long id;
+    private String name;
+    private String email;
+    private String bannerUrl;
+    private String avatarUrl;
+    private String city;
+    private String postcode;
+    private String about;
+    private OffsetDateTime createdAt;
+}
+```
+
+`UserResponse` deliberately has no `passwordHash` field. That's the whole reason it exists
+instead of just returning `User` directly.
+
+**DTOs I chose to skip**: `Category`, `Media`, `Support`. These are flat, nothing sensitive, and
+nothing else has a back-reference to them (no recursion risk), so the controller just returns the
+entity directly.
+
+### Adding spring-boot-starter-validation
+
+```xml
+
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-validation</artifactId>
+</dependency>
+```
+
+### @Valid vs JPA automatic validation
+
+On the DTO, validation only runs because the controller says so:
+
+```java
+
+@PostMapping("/user/register")
+UserResponse register(@Valid @RequestBody UserRegisterRequest userRequest) {
+    return userService.register(userRequest);
+}
+```
+
+Without `@Valid` here, `@NotBlank`/`@Email` on `UserRegisterRequest` would have no effect.
+
+On the `@Entity`, the exact same kind of annotations get checked automatically, with **no**
+`@Valid` anywhere:
+
+```java
+
+@Entity
+@Table(name = "users")
+public class User {
+    @Column(columnDefinition = "TEXT", nullable = false)
+    @NotBlank(message = ErrorMessages.NAME_REQUIRED)
+    private String name;
+    // ...
+}
+```
+
+This works because Bean Validation integration is part of the JPA spec itself. Hibernate checks
+for a Bean Validation provider (Hibernate Validator, which the dependency above brings in) and,
+if present, validates the entity automatically right before every insert/update.
+
+## 28.07 @Transactional annotation
+
+There are these two ways of doing update:
+
+### fetching, setting and saving:
 
 ```java
 public UserResponse update(Long id, UserUpdateRequest
@@ -234,7 +354,7 @@ public UserResponse update(Long id, UserUpdateRequest
 }
 ```
 
-Option B — @Transactional, no explicit save() at all:
+### using @Transactional, no explicit save():
 
 ```java
 
@@ -243,22 +363,137 @@ public UserResponse update(Long id, UserUpdateRequest request) {
     var user = repository.findById(id)
                          .orElseThrow(() -> new NotFoundException(ErrorMessages.USER_NOT_FOUND));
 
+    user.setName(request.getName());
     user.setCity(request.getCity());
     user.setPostcode(request.getPostcode());
-    // ... same setters, no repository.save(user) call needed                                                                                                                                                                    
+    user.setAvatarUrl(request.getAvatarUrl());
+    user.setBannerUrl(request.getBannerUrl());
+    user.setAbout(request.getAbout());
 
-    return new UserResponse(/* ... */);
+    return new UserResponse(user.getId(), user.getName(), user.getEmail(),
+            user.getBannerUrl(), user.getAvatarUrl(), user.getCity(),
+            user.getPostcode(), user.getAbout(), user.getCreatedAt());
 }
 ```
 
-Why option B works without calling save(): this is exactly what @Transactional is for, and it's genuinely worth
-understanding rather than treating as magic. Without @Transactional on the service method, each individual       
-repository call (findById) runs in its own short-lived transaction managed internally by Spring Data — by the time it
+Without @Transactional on the service method, each individual
+repository call (findById) runs in its own short-lived transaction managed internally by Spring Data. By the time it
 returns, that transaction (and the Hibernate session backing it) has already closed, so the User object you
-get back is detached: nothing is watching it anymore, and mutating its fields afterward does nothing until you
-explicitly save() it again (that's Option A).
+get back is detached: mutating its fields afterward does nothing until you
+explicitly save() it again.
 
-With @Transactional on the whole method, one single transaction spans the entire method body — findById returns a
+With @Transactional on the whole method, one single transaction spans the entire method body, findById returns a
 managed entity that Hibernate is actively tracking for the duration. Any field you mutate on it is             
 automatically detected ("dirty checking"), and Hibernate issues the UPDATE on its own when the transaction commits at
-the end of the method — no save() call needed at all.
+the end of the method. No save() call needed at all.
+
+## 29.07 Testing with Mockito
+
+### Controller test vs service test
+
+Controller test (`UserControllerTest`) verifies
+the whole HTTP contract, not the service's internal logic:
+
+```java
+
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@AutoConfigureRestTestClient
+public class UserControllerTest {
+
+    @MockitoBean
+    UserService service;
+
+    @Autowired
+    RestTestClient client;
+```
+
+Service tests have no Spring context at all, just Mockito. Verifies the service's
+own logic in isolation, with no DB and no HTTP involved:
+
+```java
+
+@ExtendWith(MockitoExtension.class)
+class UserServiceTest {
+
+    UserService service;
+
+    @Mock
+    UserRepository repository;
+
+    @BeforeEach
+    void setup() {
+        service = new UserService(repository);
+    }
+```
+
+### `when(...)` — stub what a mock returns
+
+```java
+when(repository.findByEmail("bob@ross.com")).
+
+thenReturn(Optional.empty());
+```
+
+Only matches calls whose arguments are `.equals()` to what was stubbed. This is why request DTOs
+without `@EqualsAndHashCode` can break a `when(mock.method(exactObject))` stub if the
+real call uses a different (but equal-looking) instance. Using `any()`/`eq()` fixes it. any() tells Mockito "match this
+argument no matter what its value is, don't even try .equals().
+
+### `verify(...)` — assert a mock was actually called
+
+For void methods, there's no return value to assert on, so `verify` is the only way to confirm
+something happened:
+
+```java
+service.delete(1L);
+
+verify(repository).
+
+delete(user);
+```
+
+`never()` proves the opposite: that something did *not* happen.
+
+```java
+assertThrows(NotFoundException .class, () ->service.
+
+delete(1L));
+
+verify(repository, never()).
+
+delete(any());
+```
+
+### `ArgumentCaptor` — inspect what a mock was actually called with
+
+`when`/`verify` only let you control or confirm that a call happened, `ArgumentCaptor` lets you
+grab the real object a mock was called with. I needed this to verify password hashing, since the
+returned `UserResponse` doesn't expose `passwordHash`. I had to capture the actual `User` passed to
+`save(...)`:
+
+```java
+void registerSuccessfully() {
+
+    var request = new UserRegisterRequest("Bob Ross", "bob@ross.com", "password123", "Vienna", "1020");
+    when(repository.findByEmail("bob@ross.com")).thenReturn(Optional.empty());
+    when(repository.save(any())).thenAnswer(invocation -> {
+        User savedUser = invocation.getArgument(0);
+        savedUser.setId(1L);
+        savedUser.setCreatedAt(createdAt);
+        return savedUser;
+    });
+
+    var result = service.register(request);
+
+    var userCaptor = ArgumentCaptor.forClass(User.class);
+    verify(repository).save(userCaptor.capture());
+    var savedUser = userCaptor.getValue();
+
+    assertNotEquals("password123", savedUser.getPasswordHash());
+    assertTrue(encoder.matches("password123", savedUser.getPasswordHash()));
+
+    var expectedUserResponse = new UserResponse(1L, "Bob Ross", "bob@ross.com", null, null, "Vienna", "1020", null, createdAt);
+    assertEquals(expectedUserResponse, result);
+}
+```
+
