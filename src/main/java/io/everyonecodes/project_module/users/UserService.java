@@ -30,16 +30,12 @@ public class UserService {
         var passwordHash = encoder.encode(password);
         var newUser = new User(null, userRequest.getName(), email, passwordHash, null, null, userRequest.getCity(), userRequest.getPostcode(), null, null);
         var savedUser = repository.save(newUser);
-        return new UserResponse(savedUser.getId(), savedUser.getName(), savedUser.getEmail(),
-                savedUser.getBannerUrl(), savedUser.getAvatarUrl(), savedUser.getCity(),
-                savedUser.getPostcode(), savedUser.getAbout(), savedUser.getCreatedAt());
+        return UserResponse.from(savedUser);
     }
 
     public Optional<UserResponse> getById(Long id) {
         return repository.findById(id)
-                         .map(user -> new UserResponse(user.getId(), user.getName(), user.getEmail(),
-                                 user.getBannerUrl(), user.getAvatarUrl(), user.getCity(),
-                                 user.getPostcode(), user.getAbout(), user.getCreatedAt()));
+                         .map(UserResponse::from);
     }
 
     @Transactional
@@ -54,9 +50,7 @@ public class UserService {
         user.setBannerUrl(request.getBannerUrl());
         user.setAbout(request.getAbout());
 
-        return new UserResponse(user.getId(), user.getName(), user.getEmail(),
-                user.getBannerUrl(), user.getAvatarUrl(), user.getCity(),
-                user.getPostcode(), user.getAbout(), user.getCreatedAt());
+        return UserResponse.from(user);
     }
 
     public void delete(Long id) {

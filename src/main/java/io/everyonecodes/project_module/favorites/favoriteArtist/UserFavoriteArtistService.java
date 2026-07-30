@@ -38,8 +38,7 @@ public class UserFavoriteArtistService {
         }
 
         repository.save(new UserFavoriteArtist(user, artist));
-
-        return new UserResponse(artist.getId(), artist.getName(), artist.getEmail(), artist.getBannerUrl(), artist.getAvatarUrl(), artist.getCity(), artist.getPostcode(), artist.getAbout(), artist.getCreatedAt());
+        return UserResponse.from(artist);
     }
 
     public void deleteFavoriteArtist(Long userId, Long artistId) {
@@ -51,12 +50,8 @@ public class UserFavoriteArtistService {
 
     public List<UserResponse> listFavoriteArtists(Long userId) {
         List<UserFavoriteArtist> userFavoriteArtists = repository.findByUserId(userId);
-        return userFavoriteArtists.stream().map(
-                fav -> {
-                    var artist = fav.getArtist();
-                    return new UserResponse(artist.getId(), artist.getName(), artist.getEmail(),
-                            artist.getBannerUrl(), artist.getAvatarUrl(), artist.getCity(),
-                            artist.getPostcode(), artist.getAbout(), artist.getCreatedAt());
-                }).toList();
+        return userFavoriteArtists.stream()
+                                  .map(fav -> UserResponse.from(fav.getArtist()))
+                                  .toList();
     }
 }
