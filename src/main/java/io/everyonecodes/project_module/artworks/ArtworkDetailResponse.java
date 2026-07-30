@@ -36,7 +36,7 @@ public class ArtworkDetailResponse {
     private String aboutArtist;
 
     private Long categoryId;
-    private Long categoryCode;
+    private String categoryCode;
     private String categoryName;
 
     private Long mediumId;
