@@ -3,8 +3,11 @@ package io.everyonecodes.project_module.artworks;
 import io.everyonecodes.project_module.classification.category.Category;
 import io.everyonecodes.project_module.classification.media.Media;
 import io.everyonecodes.project_module.classification.support.Support;
+import io.everyonecodes.project_module.exceptions.ErrorMessages;
 import io.everyonecodes.project_module.users.User;
 import jakarta.persistence.*;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Positive;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.OnDelete;
@@ -30,21 +33,27 @@ public class Artwork {
     private User artist;
 
     @Column(columnDefinition = "TEXT", nullable = false)
+    @NotBlank(message = ErrorMessages.TITLE_REQUIRED)
     private String title;
 
     @Column(columnDefinition = "NUMERIC(12,2)", nullable = false)
+    @Positive(message = ErrorMessages.PRICE_INVALID)
     private double price;
 
     @Column(nullable = false)
+    @Positive(message = ErrorMessages.YEAR_INVALID)
     private int year;
 
     @Column(columnDefinition = "TEXT", nullable = false)
+    @NotBlank(message = ErrorMessages.DESCRIPTION_REQUIRED)
     private String description;
 
     @Column(columnDefinition = "TEXT", nullable = false)
+    @NotBlank(message = ErrorMessages.CITY_REQUIRED)
     private String city;
 
     @Column(columnDefinition = "TEXT", nullable = false)
+    @NotBlank(message = ErrorMessages.POSTCODE_REQUIRED)
     private String postcode;
 
     @Embedded

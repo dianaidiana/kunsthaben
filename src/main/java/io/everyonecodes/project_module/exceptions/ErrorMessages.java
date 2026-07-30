@@ -23,6 +23,13 @@ public final class ErrorMessages {
     public static final String BANNER_URL_INVALID = "banner URL must be valid";
     public static final String AVATAR_URL_INVALID = "avatar URL must be valid";
 
+    public static final String TITLE_REQUIRED = "title should not be empty";
+    public static final String PRICE_INVALID = "price must be positive";
+    public static final String YEAR_INVALID = "year must be positive";
+    public static final String DESCRIPTION_REQUIRED = "description should not be empty";
+    public static final String URL_REQUIRED = "url should not be empty";
+    public static final String SORT_ORDER_INVALID = "sort order must be zero or positive";
+
     public static final String FRAME_DIMENSIONS_INVALID = "Frame dimensions must be positive";
     public static final String DIMENSIONS_INVALID = "Dimensions must be positive";
 
