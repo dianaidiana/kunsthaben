@@ -22,6 +22,7 @@ public final class ErrorMessages {
     public static final String POSTCODE_REQUIRED = "postcode should not be empty";
     public static final String BANNER_URL_INVALID = "banner URL must be valid";
     public static final String AVATAR_URL_INVALID = "avatar URL must be valid";
+    public static final String CATEGORY_REQUIRED = "category is required";
 
     public static final String TITLE_REQUIRED = "title should not be empty";
     public static final String PRICE_INVALID = "price must be positive";
