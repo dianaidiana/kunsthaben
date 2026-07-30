@@ -33,6 +33,13 @@ public class ApiExceptionHandler {
                 .body(e.getMessage());
     }
 
+    @ExceptionHandler(ForbiddenException.class)
+    public ResponseEntity<String> handleForbiddenException(ForbiddenException e) {
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .body(e.getMessage());
+    }
+
     // Thrown by Spring MVC itself. It carries a BindingResult with one FieldError per failed constraint
     // (field name + the message from the annotation, e.g. @NotBlank(message = "...")).
     @ExceptionHandler(MethodArgumentNotValidException.class)
