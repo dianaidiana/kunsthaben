@@ -26,15 +26,13 @@ public class Frame {
     @Column(name = "dim_frame_z", columnDefinition = "NUMERIC(8,2) CHECK (dim_frame_z > 0)")
     private Double dimZ;
 
-    // factories for framed or unframed
-    public static Frame framed(double dimX, double dimY, Double dimZ) {
-        if (dimX <= 0 || dimY <= 0 || (dimZ != null && dimZ <= 0)) {
+    public static Frame of(boolean framed, Double dimX, Double dimY, Double dimZ) {
+        if (!framed) {
+            return new Frame(false, null, null, null);
+        }
+        if (dimX == null || dimY == null || dimX <= 0 || dimY <= 0 || (dimZ != null && dimZ <= 0)) {
             throw new IllegalArgumentException(ErrorMessages.FRAME_DIMENSIONS_INVALID);
         }
         return new Frame(true, dimX, dimY, dimZ);
-    }
-
-    public static Frame unframed() {
-        return new Frame(false, null, null, null);
     }
 }
