@@ -7,15 +7,11 @@ import io.everyonecodes.project_module.classification.media.MediaRepository;
 import io.everyonecodes.project_module.classification.support.Support;
 import io.everyonecodes.project_module.classification.support.SupportRepository;
 import io.everyonecodes.project_module.exceptions.ErrorMessages;
-import io.everyonecodes.project_module.exceptions.ForbiddenException;
 import io.everyonecodes.project_module.exceptions.NotFoundException;
 import io.everyonecodes.project_module.users.UserRepository;
-import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
 
-import java.time.OffsetDateTime;
 import java.util.ArrayList;
-import java.util.Optional;
 
 @Service
 public class ArtworkService {

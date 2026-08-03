@@ -1,4 +1,4 @@
-package io.everyonecodes.project_module.favorites.favoriteArtist;
+package io.everyonecodes.project_module.favorites.favoriteartist;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
