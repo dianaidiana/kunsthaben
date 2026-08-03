@@ -327,6 +327,33 @@ This works because Bean Validation integration is part of the JPA spec itself. H
 for a Bean Validation provider (Hibernate Validator, which the dependency above brings in) and,
 if present, validates the entity automatically right before every insert/update.
 
+### Error handling for validation
+
+There are two different Errors that will be thrown after validation. `MethodArgumentNotValidException.class`
+is thrown by Spring MVC itself. It carries a BindingResult with one FieldError per failed constraint
+(field name + the message from the annotation, e.g. @NotBlank(message = "...")).
+
+```java
+
+@ExceptionHandler(MethodArgumentNotValidException.class)
+public ResponseEntity<Map<String, String>> handleSpringMvcValidation(MethodArgumentNotValidException e) {
+    Map<String, String> errors = new HashMap<>();
+    e.getBindingResult().getFieldErrors()
+     .forEach(error -> errors.put(error.getField(), error.getDefaultMessage()));
+    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errors);
+}
+```
+
+`jakarta.validation.ConstraintViolationException.class` is the Entity validation failure (thrown by Hibernate/JPA)
+
+```java 
+
+@ExceptionHandler(jakarta.validation.ConstraintViolationException.class)
+public ResponseEntity<String> handleEntityValidation(jakarta.validation.ConstraintViolationException e) {
+    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+}
+```
+
 ## 28.07 @Transactional annotation
 
 There are these two ways of doing update:
