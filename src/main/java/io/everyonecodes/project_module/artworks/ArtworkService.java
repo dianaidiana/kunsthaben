@@ -7,6 +7,7 @@ import io.everyonecodes.project_module.classification.media.MediaRepository;
 import io.everyonecodes.project_module.classification.support.Support;
 import io.everyonecodes.project_module.classification.support.SupportRepository;
 import io.everyonecodes.project_module.exceptions.ErrorMessages;
+import io.everyonecodes.project_module.exceptions.ForbiddenException;
 import io.everyonecodes.project_module.exceptions.NotFoundException;
 import io.everyonecodes.project_module.users.UserRepository;
 import jakarta.transaction.Transactional;
@@ -35,6 +36,26 @@ public class ArtworkService {
         this.supportRepository = supportRepository;
     }
 
+    public Optional<ArtworkDetailResponse> getDetailById(Long id) {
+        return repository.findByIdAndDeletedAtIsNull(id)
+                         .map(ArtworkDetailResponse::from);
+    }
+
+    public List<ArtworkCardResponse> getAllCards() {
+        return repository.findAllByDeletedAtIsNull()
+                         .stream()
+                         .map(ArtworkCardResponse::from)
+                         .sorted(Comparator.comparing(ArtworkCardResponse::getCreatedAt))
+                         .toList();
+    }
+
+    public List<ArtworkCardResponse> getAllCardsByArtistIdNewestFirst(Long artistId) {
+        return repository.findAllByArtistIdAndDeletedAtIsNullOrderByCreatedAtDesc(artistId)
+                         .stream()
+                         .map(ArtworkCardResponse::from)
+                         .toList();
+    }
+
     public ArtworkDetailResponse create(Long artistId, ArtworkCreateRequest request) {
         var artist = userRepository.findById(artistId)
                                    .orElseThrow(() -> new NotFoundException(ErrorMessages.USER_NOT_FOUND));
@@ -52,30 +73,10 @@ public class ArtworkService {
         return ArtworkDetailResponse.from(savedArtwork);
     }
 
-    public Optional<ArtworkDetailResponse> getById(Long id) {
-        return repository.findByIdAndDeletedAtIsNull(id)
-                         .map(ArtworkDetailResponse::from);
-    }
-
-    public List<ArtworkCardResponse> getAll() {
-        return repository.findAllByDeletedAtIsNull()
-                         .stream()
-                         .map(ArtworkCardResponse::from)
-                         .sorted(Comparator.comparing(ArtworkCardResponse::getCreatedAt))
-                         .toList();
-    }
-
-    public List<ArtworkCardResponse> getAllByArtistIdNewestFirst(Long artistId) {
-        return repository.findAllByArtistIdAndDeletedAtIsNullOrderByCreatedAtDesc(artistId)
-                         .stream()
-                         .map(ArtworkCardResponse::from)
-                         .toList();
-    }
 
     @Transactional
-    public ArtworkDetailResponse update(Long artworkId, ArtworkUpdateRequest request) {
-        var artwork = repository.findById(artworkId).orElseThrow(() -> new NotFoundException(ErrorMessages.ARTWORK_NOT_FOUND));
-
+    public ArtworkDetailResponse update(Long artistId, Long artworkId, ArtworkUpdateRequest request) {
+        var artwork = fetchOwnedArtwork(artistId, artworkId);
         var category = fetchCategory(request.getCategoryId());
         var medium = fetchMedium(request.getMediumId());
         var support = fetchSupport(request.getSupportId());
@@ -98,28 +99,33 @@ public class ArtworkService {
     }
 
     @Transactional
-    public void delete(Long artworkId) {
-        var artwork = repository.findById(artworkId)
-                                .filter(a -> a.getDeletedAt() == null)
-                                .orElseThrow(() -> new NotFoundException(ErrorMessages.ARTWORK_NOT_FOUND));
-
+    public void delete(Long artistId, Long artworkId) {
+        var artwork = fetchOwnedArtwork(artistId, artworkId);
         artwork.setDeletedAt(OffsetDateTime.now());
     }
 
     @Transactional
-    public ArtworkDetailResponse markReserved(Long artworkId, boolean reserved) {
-        var artwork = repository.findById(artworkId)
-                                .orElseThrow(() -> new NotFoundException(ErrorMessages.ARTWORK_NOT_FOUND));
+    public ArtworkDetailResponse markReserved(Long artistId, Long artworkId, boolean reserved) {
+        var artwork = fetchOwnedArtwork(artistId, artworkId);
         artwork.setReserved(reserved);
         return ArtworkDetailResponse.from(artwork);
     }
 
     @Transactional
-    public ArtworkDetailResponse markSold(Long artworkId, boolean sold) {
-        var artwork = repository.findById(artworkId)
-                                .orElseThrow(() -> new NotFoundException(ErrorMessages.ARTWORK_NOT_FOUND));
+    public ArtworkDetailResponse markSold(Long artistId, Long artworkId, boolean sold) {
+        var artwork = fetchOwnedArtwork(artistId, artworkId);
         artwork.setSold(sold);
         return ArtworkDetailResponse.from(artwork);
+    }
+
+    private Artwork fetchOwnedArtwork(Long artistId, Long artworkId) {
+        var artwork = repository.findByIdAndDeletedAtIsNull(artworkId)
+                                .orElseThrow(() -> new NotFoundException(ErrorMessages.ARTWORK_NOT_FOUND));
+
+        if (!artwork.getArtist().getId().equals(artistId)) {
+            throw new ForbiddenException(ErrorMessages.NOT_ARTWORK_OWNER);
+        }
+        return artwork;
     }
 
     private Category fetchCategory(Long categoryId) {

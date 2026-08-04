@@ -29,6 +29,7 @@ public class Artwork {
     private Long id;
 
     @ManyToOne
+    @JoinColumn(name = "artist_id", nullable = false)
     @OnDelete(action = OnDeleteAction.CASCADE)
     private User artist;
 
