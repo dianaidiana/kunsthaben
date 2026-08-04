@@ -49,4 +49,43 @@ public class ArtworkDetailResponse {
     private OffsetDateTime createdAt;
 
     private List<String> imageUrls;
+
+    public static ArtworkDetailResponse from(Artwork artwork) {
+        var dimensions = artwork.getDimensions();
+        var frame = artwork.getFrame();
+        var artist = artwork.getArtist();
+        var category = artwork.getCategory();
+        var medium = artwork.getMedia();
+        var support = artwork.getSupport();
+
+        return new ArtworkDetailResponse(
+                artwork.getId(),
+                artwork.getTitle(),
+                artwork.getDescription(),
+                artwork.getPrice(),
+                artwork.getYear(),
+                artwork.getCity(),
+                artwork.getPostcode(),
+                dimensions.getX(),
+                dimensions.getY(),
+                dimensions.getZ(),
+                frame.isFramed(),
+                frame.getDimX(),
+                frame.getDimY(),
+                frame.getDimZ(),
+                artist.getId(),
+                artist.getName(),
+                artist.getAbout(),
+                category != null ? category.getId() : null,
+                category != null ? category.getCode() : null,
+                category != null ? category.getName() : null,
+                medium != null ? medium.getId() : null,
+                medium != null ? medium.getName() : null,
+                support != null ? support.getId() : null,
+                support != null ? support.getName() : null,
+                artwork.isReserved(),
+                artwork.getCreatedAt(),
+                artwork.getImages().stream().map(ArtworkImage::getUrl).toList()
+        );
+    }
 }
