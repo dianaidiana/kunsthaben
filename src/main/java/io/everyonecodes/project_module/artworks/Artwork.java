@@ -81,8 +81,8 @@ public class Artwork {
     @Column
     private OffsetDateTime deletedAt;
 
-    @Column
-    private OffsetDateTime soldAt;
+    @Column(columnDefinition = "BOOLEAN DEFAULT false")
+    private boolean sold;
 
     @Column(columnDefinition = "BOOLEAN DEFAULT false")
     private boolean reserved;
