@@ -45,6 +45,7 @@ public class ArtworkDetailResponse {
     private Long supportId;
     private String supportName;
 
+    private boolean sold;
     private boolean reserved;
     private OffsetDateTime createdAt;
 
@@ -83,6 +84,7 @@ public class ArtworkDetailResponse {
                 medium != null ? medium.getName() : null,
                 support != null ? support.getId() : null,
                 support != null ? support.getName() : null,
+                artwork.isSold(),
                 artwork.isReserved(),
                 artwork.getCreatedAt(),
                 artwork.getImages().stream().map(ArtworkImage::getUrl).toList()
