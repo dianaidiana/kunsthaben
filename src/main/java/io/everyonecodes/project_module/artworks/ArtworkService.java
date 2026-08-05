@@ -10,8 +10,8 @@ import io.everyonecodes.project_module.exceptions.ErrorMessages;
 import io.everyonecodes.project_module.exceptions.ForbiddenException;
 import io.everyonecodes.project_module.exceptions.NotFoundException;
 import io.everyonecodes.project_module.users.UserRepository;
-import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -35,11 +35,13 @@ public class ArtworkService {
         this.supportRepository = supportRepository;
     }
 
+    @Transactional(readOnly = true)
     public Optional<ArtworkDetailResponse> getDetailById(Long id) {
         return repository.findByIdAndDeletedAtIsNull(id)
                          .map(ArtworkDetailResponse::from);
     }
 
+    @Transactional(readOnly = true)
     public List<ArtworkCardResponse> getAllCards() {
         return repository.findAllByDeletedAtIsNullAndSoldOrderByCreatedAtDesc(false)
                          .stream()
@@ -47,6 +49,7 @@ public class ArtworkService {
                          .toList();
     }
 
+    @Transactional(readOnly = true)
     public List<ArtworkCardResponse> getUnsoldCardsByArtistId(Long artistId) {
         return repository.findAllByArtistIdAndDeletedAtIsNullAndSoldOrderByCreatedAtDesc(artistId, false)
                          .stream()
@@ -54,6 +57,7 @@ public class ArtworkService {
                          .toList();
     }
 
+    @Transactional(readOnly = true)
     public List<ArtworkCardResponse> getSoldCardsByArtistId(Long artistId) {
         return repository.findAllByArtistIdAndDeletedAtIsNullAndSoldOrderByCreatedAtDesc(artistId, true)
                          .stream()
