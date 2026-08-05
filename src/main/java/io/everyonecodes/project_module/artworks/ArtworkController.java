@@ -28,8 +28,13 @@ public class ArtworkController {
     }
 
     @GetMapping("/user/{artistId}/artwork")
-    List<ArtworkCardResponse> getAllCardsByArtistIdNewestFirst(@PathVariable Long artistId) {
-        return service.getAllCardsByArtistIdNewestFirst(artistId);
+    List<ArtworkCardResponse> getUnsoldCardsByArtistId(@PathVariable Long artistId) {
+        return service.getUnsoldCardsByArtistId(artistId);
+    }
+
+    @GetMapping("/user/{artistId}/artwork/sold")
+    List<ArtworkCardResponse> getSoldCardsByArtistId(@PathVariable Long artistId) {
+        return service.getSoldCardsByArtistId(artistId);
     }
 
     @PostMapping("/user/{artistId}/artwork")
