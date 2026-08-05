@@ -10,8 +10,6 @@ public interface ArtworkRepository extends JpaRepository<Artwork, Long>, JpaSpec
     Optional<Artwork> findByIdAndDeletedAtIsNull(Long id);
 
     List<Artwork> findAllByDeletedAtIsNullAndSoldOrderByCreatedAtDesc(boolean sold);
-
-    List<Artwork> findAllByArtistIdAndDeletedAtIsNullOrderByCreatedAtDesc(Long artistId);
-
+    
     List<Artwork> findAllByArtistIdAndDeletedAtIsNullAndSoldOrderByCreatedAtDesc(Long artistId, boolean sold);
 }

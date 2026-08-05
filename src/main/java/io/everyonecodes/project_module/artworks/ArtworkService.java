@@ -41,14 +41,21 @@ public class ArtworkService {
     }
 
     public List<ArtworkCardResponse> getAllCards() {
-        return repository.findAllByDeletedAtIsNullOrderByCreatedAtDesc()
+        return repository.findAllByDeletedAtIsNullAndSoldOrderByCreatedAtDesc(false)
                          .stream()
                          .map(ArtworkCardResponse::from)
                          .toList();
     }
 
-    public List<ArtworkCardResponse> getAllCardsByArtistIdNewestFirst(Long artistId) {
-        return repository.findAllByArtistIdAndDeletedAtIsNullOrderByCreatedAtDesc(artistId)
+    public List<ArtworkCardResponse> getUnsoldCardsByArtistId(Long artistId) {
+        return repository.findAllByArtistIdAndDeletedAtIsNullAndSoldOrderByCreatedAtDesc(artistId, false)
+                         .stream()
+                         .map(ArtworkCardResponse::from)
+                         .toList();
+    }
+
+    public List<ArtworkCardResponse> getSoldCardsByArtistId(Long artistId) {
+        return repository.findAllByArtistIdAndDeletedAtIsNullAndSoldOrderByCreatedAtDesc(artistId, true)
                          .stream()
                          .map(ArtworkCardResponse::from)
                          .toList();
