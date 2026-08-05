@@ -91,4 +91,9 @@ public class Artwork {
     @OneToMany(mappedBy = "artwork", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("sortOrder ASC")
     private List<ArtworkImage> images = new ArrayList<>();
+
+    public void addImage(ArtworkImage image) {
+        images.add(image);
+        image.setArtwork(this);
+    }
 }
