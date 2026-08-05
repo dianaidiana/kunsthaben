@@ -3,6 +3,10 @@ package io.everyonecodes.project_module.artworks;
 import io.everyonecodes.project_module.exceptions.ErrorMessages;
 import io.everyonecodes.project_module.exceptions.NotFoundException;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -23,18 +27,21 @@ public class ArtworkController {
     }
 
     @GetMapping("/artwork")
-    List<ArtworkCardResponse> getAllCards() {
-        return service.getAllCards();
+    Page<ArtworkCardResponse> getAllCards(@PageableDefault(size = 20, sort = "createdAt", direction =
+            Sort.Direction.DESC) Pageable pageable) {
+        return service.getAllCards(pageable);
     }
 
     @GetMapping("/user/{artistId}/artwork")
-    List<ArtworkCardResponse> getUnsoldCardsByArtistId(@PathVariable Long artistId) {
-        return service.getUnsoldCardsByArtistId(artistId);
+    Page<ArtworkCardResponse> getUnsoldCardsByArtistId(@PathVariable Long artistId, @PageableDefault(size = 20, sort = "createdAt", direction =
+            Sort.Direction.DESC) Pageable pageable) {
+        return service.getUnsoldCardsByArtistId(artistId, pageable);
     }
 
     @GetMapping("/user/{artistId}/artwork/sold")
-    List<ArtworkCardResponse> getSoldCardsByArtistId(@PathVariable Long artistId) {
-        return service.getSoldCardsByArtistId(artistId);
+    Page<ArtworkCardResponse> getSoldCardsByArtistId(@PathVariable Long artistId, @PageableDefault(size = 20, sort = "createdAt", direction =
+            Sort.Direction.DESC) Pageable pageable) {
+        return service.getSoldCardsByArtistId(artistId, pageable);
     }
 
     @PostMapping("/user/{artistId}/artwork")
