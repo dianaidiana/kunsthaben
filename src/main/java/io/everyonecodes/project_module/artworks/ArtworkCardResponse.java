@@ -23,6 +23,7 @@ public class ArtworkCardResponse {
     private String mediaName;
     private String supportName;
     private double price;
+    private boolean sold;
     private boolean reserved;
     private OffsetDateTime createdAt;
 
@@ -44,6 +45,7 @@ public class ArtworkCardResponse {
                 media != null ? media.getName() : null,
                 support != null ? support.getName() : null,
                 artwork.getPrice(),
+                artwork.isSold(),
                 artwork.isReserved(),
                 artwork.getCreatedAt()
         );
