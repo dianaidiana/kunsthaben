@@ -84,7 +84,7 @@ class ArtworkServiceTest {
     private final ArtworkCardResponse olderArtworkCardResponse = new ArtworkCardResponse(
             1L, null, "happy accident", "Bob Ross", 2026,
             category.getCode(), category.getName(), media.getName(), support.getName(),
-            100.0, false, createdAt
+            100.0, false, false, createdAt
     );
 
     private final Artwork newerArtwork = new Artwork(
@@ -102,7 +102,7 @@ class ArtworkServiceTest {
     private final ArtworkCardResponse newerArtworkCardResponse = new ArtworkCardResponse(
             2L, null, "sunrise", "Bob Ross", 2025,
             category.getCode(), category.getName(), media.getName(), support.getName(),
-            200.0, false, createdAt.plusDays(1)
+            200.0, false, false, createdAt.plusDays(1)
     );
 
     private final ArtworkCreateRequest artworkCreateRequest = new ArtworkCreateRequest(
@@ -151,7 +151,7 @@ class ArtworkServiceTest {
 
     @Test
     void getAllCardsReturnsNonDeletedNewestFirst() {
-        when(repository.findAllByDeletedAtIsNullOrderByCreatedAtDesc()).thenReturn(List.of(newerArtwork, olderArtwork));
+        when(repository.findAllByDeletedAtIsNullAndSoldOrderByCreatedAtDesc(false)).thenReturn(List.of(newerArtwork, olderArtwork));
         var result = service.getAllCards();
 
         assertEquals(List.of(newerArtworkCardResponse, olderArtworkCardResponse), result);
@@ -159,25 +159,48 @@ class ArtworkServiceTest {
 
     @Test
     void getAllCardsWhenNoneExist() {
-        when(repository.findAllByDeletedAtIsNullOrderByCreatedAtDesc()).thenReturn(List.of());
+        when(repository.findAllByDeletedAtIsNullAndSoldOrderByCreatedAtDesc(false)).thenReturn(List.of());
         var result = service.getAllCards();
 
         assertTrue(result.isEmpty());
     }
 
     @Test
-    void getAllCardsByArtistIdReturnsNewestFirst() {
-        when(repository.findAllByArtistIdAndDeletedAtIsNullOrderByCreatedAtDesc(1L))
+    void getUnsoldCardsByArtistIdReturnsNewestFirst() {
+        when(repository.findAllByArtistIdAndDeletedAtIsNullAndSoldOrderByCreatedAtDesc(1L, false))
                 .thenReturn(List.of(newerArtwork, olderArtwork));
-        var result = service.getAllCardsByArtistIdNewestFirst(1L);
+        var result = service.getUnsoldCardsByArtistId(1L);
 
         assertEquals(List.of(newerArtworkCardResponse, olderArtworkCardResponse), result);
     }
 
     @Test
-    void getAllCardsByArtistIdWhenArtistHasNone() {
-        when(repository.findAllByArtistIdAndDeletedAtIsNullOrderByCreatedAtDesc(1L)).thenReturn(List.of());
-        var result = service.getAllCardsByArtistIdNewestFirst(1L);
+    void getUnsoldCardsByArtistIdWhenArtistHasNone() {
+        when(repository.findAllByArtistIdAndDeletedAtIsNullAndSoldOrderByCreatedAtDesc(1L, false)).thenReturn(List.of());
+        var result = service.getUnsoldCardsByArtistId(1L);
+
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void getSoldCardsByArtistIdReturnsNewestFirst() {
+        olderArtwork.setSold(true);
+        newerArtwork.setSold(true);
+        olderArtworkCardResponse.setSold(true);
+        newerArtworkCardResponse.setSold(true);
+
+        when(repository.findAllByArtistIdAndDeletedAtIsNullAndSoldOrderByCreatedAtDesc(1L, true))
+                .thenReturn(List.of(newerArtwork, olderArtwork));
+
+        var result = service.getSoldCardsByArtistId(1L);
+
+        assertEquals(List.of(newerArtworkCardResponse, olderArtworkCardResponse), result);
+    }
+
+    @Test
+    void getSoldCardsByArtistIdWhenArtistHasNoneSold() {
+        when(repository.findAllByArtistIdAndDeletedAtIsNullAndSoldOrderByCreatedAtDesc(1L, true)).thenReturn(List.of());
+        var result = service.getSoldCardsByArtistId(1L);
 
         assertTrue(result.isEmpty());
     }
