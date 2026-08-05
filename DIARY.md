@@ -524,3 +524,92 @@ void registerSuccessfully() {
 }
 ```
 
+## 05.08 Relationships: owning side, and lazy loading
+
+### 1. Only one side of a relationship is "real" to Hibernate
+
+I have this in `Artwork`:
+
+```java
+
+@OneToMany(mappedBy = "artwork", cascade = CascadeType.ALL, orphanRemoval = true)
+@OrderBy("sortOrder ASC")
+private List<ArtworkImage> images = new ArrayList<>();
+```
+
+and this in `ArtworkImage`:
+
+```java
+
+@ManyToOne(fetch = FetchType.LAZY)
+@JoinColumn(name = "artwork_id", nullable = false)
+private Artwork artwork;
+```
+
+I thought since I can navigate both ways in Java (`artwork.getImages()` and
+`image.getArtwork()`), both sides were "equal". They're not. In the actual database there is only
+**one** column that stores this relationship: `artwork_id`, sitting on the `artwork_images` table.
+`artworks` has no column pointing back at all.
+
+So Hibernate needs to know which of my two Java fields it should actually trust when saving. That's
+exactly what `@JoinColumn` vs `mappedBy` mean:
+
+- `@JoinColumn` on `ArtworkImage.artwork` → this is the **owning side**. Hibernate writes to
+  `artwork_id` based on *this* field.
+- `mappedBy = "artwork"` on `Artwork.images` → the **inverse side**. It's just a convenience for
+  reading (`SELECT * FROM artwork_images WHERE artwork_id = ?` under the hood), Hibernate ignores it
+  when saving.
+
+Which means if I ever write code like this:
+
+```java
+artwork.getImages().add(newImage);
+```
+
+it does nothing to persist the relationship, because I never touched `newImage.getArtwork()`.
+Hibernate would try to insert the image with `artwork_id = NULL` and the DB would reject it
+(`nullable = false`).
+
+The fix is to always keep both sides in sync, and the standard way to not forget is a small helper
+method on the parent entity:
+
+```java
+public void addImage(ArtworkImage image) {
+    images.add(image);
+    image.setArtwork(this);
+}
+```
+
+### 2. Lazy collections need an open DB session to be read
+
+`@OneToMany` collections are lazy by default (unlike `@ManyToOne`, which is eager by default). 
+Hibernate doesn't put a real list in `artwork.images`,
+it puts a placeholder that says "run a query the first time someone actually touches me". For that
+trick to work, the database session (Hibernate calls it the "persistence context") has to still be
+open at that exact moment. If it's already closed, you get a `LazyInitializationException`.
+
+My `getDetailById`/`getAllCards` methods call `.getImages()` (indirectly, through
+`ArtworkDetailResponse.from(...)`/`ArtworkCardResponse.from(...)`) without being `@Transactional`
+at all, so by that logic they should already be broken. They're not, because Spring Boot has
+`spring.jpa.open-in-view=true` **on by default**, which keeps the session open for the whole HTTP
+request instead of closing it right after the method returns. So it "just works", invisibly,
+because of a setting I never touched or even knew existed.
+
+If `open-in-view` ever gets turned off, all my reads that touch lazy
+collections would suddenly break, for a reason that would be very hard to trace back to one config
+line. So the "honest" fix is to say directly, on the method itself, that it needs a session:
+
+```java
+
+@Transactional(readOnly = true)
+public Optional<ArtworkDetailResponse> getDetailById(Long id) {
+    return repository.findByIdAndDeletedAtIsNull(id)
+                     .map(ArtworkDetailResponse::from);
+}
+```
+
+I already had `@Transactional` imported in `ArtworkService`, but
+from `jakarta.transaction`, not Spring's. `readOnly` doesn't exist on that one at all — it's a
+Spring-only attribute. Had to switch the import to
+`org.springframework.transaction.annotation.Transactional` for `readOnly = true` to even compile.
+
