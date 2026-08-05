@@ -9,7 +9,9 @@ import java.util.Optional;
 public interface ArtworkRepository extends JpaRepository<Artwork, Long>, JpaSpecificationExecutor<Artwork> {
     Optional<Artwork> findByIdAndDeletedAtIsNull(Long id);
 
-    List<Artwork> findAllByDeletedAtIsNullOrderByCreatedAtDesc();
+    List<Artwork> findAllByDeletedAtIsNullAndSoldOrderByCreatedAtDesc(boolean sold);
 
     List<Artwork> findAllByArtistIdAndDeletedAtIsNullOrderByCreatedAtDesc(Long artistId);
+
+    List<Artwork> findAllByArtistIdAndDeletedAtIsNullAndSoldOrderByCreatedAtDesc(Long artistId, boolean sold);
 }
