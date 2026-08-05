@@ -15,7 +15,6 @@ import org.springframework.stereotype.Service;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
@@ -42,10 +41,9 @@ public class ArtworkService {
     }
 
     public List<ArtworkCardResponse> getAllCards() {
-        return repository.findAllByDeletedAtIsNull()
+        return repository.findAllByDeletedAtIsNullOrderByCreatedAtDesc()
                          .stream()
                          .map(ArtworkCardResponse::from)
-                         .sorted(Comparator.comparing(ArtworkCardResponse::getCreatedAt))
                          .toList();
     }
 
