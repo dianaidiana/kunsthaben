@@ -10,7 +10,7 @@ import java.util.List;
 @Setter
 @Getter
 public class ArtworkFilter {
-    private String keyword;
+    private String keywords;
 
     private Double minPrice;
     private Double maxPrice;

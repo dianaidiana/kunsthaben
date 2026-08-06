@@ -7,11 +7,11 @@ import java.util.List;
 
 public class ArtworkSpecifications {
 
-    public static Specification<Artwork> matchesKeywords(String keyword) {
-        if (keyword == null || keyword.isBlank()) {
+    public static Specification<Artwork> matchesKeywords(String keywords) {
+        if (keywords == null || keywords.isBlank()) {
             return null;
         }
-        return Arrays.stream(keyword.trim().split("\\s+"))
+        return Arrays.stream(keywords.trim().split("\\s+"))
                      .map(ArtworkSpecifications::matchesKeyword)
                      .reduce(Specification::and)
                      .orElse(null);
@@ -169,7 +169,7 @@ public class ArtworkSpecifications {
         return Specification
                 .where(isNotDeleted())
                 .and(isNotSold())
-                .and(matchesKeyword(filter.getKeyword()))
+                .and(matchesKeywords(filter.getKeywords()))
                 .and(hasMinPrice(filter.getMinPrice()))
                 .and(hasMaxPrice(filter.getMaxPrice()))
                 .and(hasCityIn(filter.getCities()))
