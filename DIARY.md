@@ -563,7 +563,9 @@ exactly what `@JoinColumn` vs `mappedBy` mean:
 Which means if I ever write code like this:
 
 ```java
-artwork.getImages().add(newImage);
+artwork.getImages().
+
+add(newImage);
 ```
 
 it does nothing to persist the relationship, because I never touched `newImage.getArtwork()`.
@@ -582,7 +584,7 @@ public void addImage(ArtworkImage image) {
 
 ### 2. Lazy collections need an open DB session to be read
 
-`@OneToMany` collections are lazy by default (unlike `@ManyToOne`, which is eager by default). 
+`@OneToMany` collections are lazy by default (unlike `@ManyToOne`, which is eager by default).
 Hibernate doesn't put a real list in `artwork.images`,
 it puts a placeholder that says "run a query the first time someone actually touches me". For that
 trick to work, the database session (Hibernate calls it the "persistence context") has to still be
@@ -612,4 +614,213 @@ I already had `@Transactional` imported in `ArtworkService`, but
 from `jakarta.transaction`, not Spring's. `readOnly` doesn't exist on that one at all — it's a
 Spring-only attribute. Had to switch the import to
 `org.springframework.transaction.annotation.Transactional` for `readOnly = true` to even compile.
+
+## 06.08 Pagination and Specification
+
+### Pagination
+
+I had `getAllCards()` returning a plain `List<ArtworkCardResponse>`, which means every call was
+fetching and returning *everything* that matched, no matter how many rows. That's fine for a demo
+with 3 artworks, but the homepage grows with the whole platform's artwork count forever, so I
+needed a way to ask for just one "page" of results at a time.
+
+Spring Data already has this built in:
+
+- `Pageable` describes *which* chunk I want (page number, page size, sorting). I build one with
+  `PageRequest.of(page, size, sort)`.
+- `Page<T>` is what comes back: the items, and also totals (`totalElements`,
+  `totalPages`) and whether there's a next page.
+
+Just by adding a `Pageable` parameter to my own repository methods, Spring Data handles the
+`LIMIT`/`OFFSET` translation to SQL for me:
+
+```java
+Page<Artwork> findAllByDeletedAtIsNullAndSold(boolean sold, Pageable pageable);
+```
+
+Worth mentioning: returning `Page<T>` costs **two queries**:
+`SELECT ... LIMIT ... OFFSET ...` for the content, plus a separate `SELECT COUNT(*)` to compute the totals. If I don't
+need the totals, `Slice<T>` is a cheaper
+alternative that skips the count query entirely.
+
+### @PageableDefault
+
+Without `@PageableDefault`, a plain `GET /artwork` with no query params would
+come back completely unsorted (Spring Data's own default), so I annotated the controller
+parameter to keep newest-first as the default behavior once I removed the hardcoded
+`OrderByCreatedAtDesc` from the repository method name:
+
+```java
+
+@GetMapping("/artwork")
+Page<ArtworkCardResponse> getAllCards(
+        @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+    return service.getAllCards(pageable);
+}
+```
+
+### PageImpl
+
+`Page<T>` is just an **interface** — it only declares what a page can *do*
+(`getContent()`, `getTotalElements()`, `getTotalPages()`, `hasNext()`, ...). `PageImpl<T>` is Spring Data's own concrete
+implementation of that interface.
+When I mock the repository
+(`when(repository.findAllByDeletedAtIsNullAndSold(...)).thenReturn(...)`), Mockito needs a real
+object to hand back, not just an interface.
+
+It has two constructors worth knowing:
+
+- `new PageImpl<>(List.of(...))`: treats the given list as the
+  whole result (one page). Good enough since my tests only
+  care about verifying the mapped content came through correctly, not exercising real pagination
+  math.
+- `new PageImpl<>(content, pageable, total)`: the fuller form, letting me simulate "this is page
+  2 of 5, out of 47 results total," if I ever need to test pagination boundaries specifically
+  (`hasNext()`, `getTotalPages()`), which I'm not doing at the moment.
+
+### Fixing this warning:
+
+For a stable JSON structure, please use Spring Data's PagedModel (globally via @EnableSpringDataWebSupport(
+pageSerializationMode = VIA_DTO)) or Spring HATEOAS and Spring Data's PagedResourcesAssembler as documented
+in https://docs.spring.io/spring-data/commons/reference/repositories/core-extensions.html#core.web.pageables.
+
+As per this blogpost (Coding Steve): https://stevenpg.com/posts/spring-data-page-impl-serialization-warning/
+
+"This warning appears when you’re returning Page<T> objects directly from your REST controllers, and Spring is warning
+you that the JSON structure might change between versions."
+
+and the fix: Use PagedModel
+
+```java
+
+@Configuration
+@EnableSpringDataWebSupport(pageSerializationMode = VIA_DTO)
+public class WebConfig {
+}
+```
+
+This configuration tells Spring to serialize Page objects using a stable DTO structure instead of the internal PageImpl
+structure.
+
+With this configuration, your existing controller methods work exactly the same, but the JSON output will use Spring’s
+stable PagedModel format:
+
+```JSON
+{
+  "content": [
+    ...
+  ],
+  "page": {
+    "size": 20,
+    "number": 0,
+    "totalElements": 100,
+    "totalPages": 5
+  }
+}
+```
+
+### I have no clue:
+
+how to test the content of a endpoint that returns a Page object. I'll come back to this later. For now, I'll just test
+the status.
+
+### Specification: composable, optional filters
+
+The other big thing today was `Specification<Artwork>` for the filters page. The core idea: one
+small method per filter criterion, each returning either a real condition or `null` when that
+filter wasn't provided:
+
+```java
+public static Specification<Artwork> hasMinPrice(Double minPrice) {
+    if (minPrice == null) return null;
+    return (root, query, cb) -> cb.greaterThanOrEqualTo(root.get("price"), minPrice);
+}
+```
+
+`Specification.where(x).and(y)` is written specifically so that a `null` Specification just gets
+skipped, not treated as an error. That's what lets me chain a dozen optional filters together and
+only the ones actually provided end up in the final `WHERE` clause:
+
+```
+Specification.where(isNotDeleted())
+        .and(isNotSold())
+        .and(hasMinPrice(filter.getMinPrice()))
+        .and(hasCategoryIn(filter.getCategoryIds()))
+// ...
+```
+
+### Case-insensitive search without `ILIKE`
+
+Postgres's `ILIKE` is for case-insensitive search, but plain JPA's
+`CriteriaBuilder` doesn't have an `ilike()` method as `ILIKE` isn't standard SQL, it's
+Postgres-only. In this case, lowercasing must be done from both sides:
+
+```java
+private static Specification<Artwork> matchesKeyword(String word) {
+    var pattern = "%" + word.toLowerCase() + "%";
+    return (root, query, cb) -> cb.or(
+            cb.like(cb.lower(root.get("title")), pattern),
+            cb.like(cb.lower(root.get("description")), pattern)
+    );
+}
+```
+
+### Multiple keyword search
+
+A single `LIKE '%red house%'` requires that exact phrase, in that exact order, to appear as one
+substring, so what I decided to do for now is to split on whitespace and require each word independently to
+appear in title or description, ANDed together:
+
+```
+return Arrays.stream(keywords.trim().split("\\s+"))
+        .map(ArtworkSpecifications::matchesKeyword)
+         .reduce(Specification::and)
+         .orElse(null);
+```
+
+This solution is not ideal and I would like to implement a filter using PostgreSQL Text Search Types
+`tsvector` and `tsquery`. This is much more involved so I'll leave it for later.
+
+### The service side
+
+```java
+
+@Transactional(readOnly = true)
+public Page<ArtworkCardResponse> search(ArtworkFilter filter, Pageable pageable) {
+    return repository.findAll(ArtworkSpecifications.build(filter), pageable)
+                     .map(ArtworkCardResponse::from);
+}
+```
+
+### The controller side
+
+```java
+
+@GetMapping("/artwork/search")
+Page<ArtworkCardResponse> search(
+        @ModelAttribute ArtworkFilter filter,
+        @PageableDefault(size = 20, sort = "createdAt", direction =
+                Sort.Direction.DESC) Pageable pageable) {
+    return service.search(filter, pageable);
+}
+```
+
+`@ModelAttribute` tells Spring: "take all the matching query parameters from this GET request and populate them onto
+this object's fields, one by one."
+Concretely, with a request like:
+
+`GET /artwork/search?keywords=house&minPrice=50&categoryIds=1&categoryIds=3&framed=true`
+
+Spring creates a new ArtworkFilter (using its no-arg constructor), then for each query param, it calls the matching
+setter:
+setKeywords("house"), setMinPrice(50.0), setCategoryIds(List.of(1L, 3L)) (repeated params automatically collect into a
+List), setFramed(true).
+Any field with no matching query param is just left at its default (null, since every field in ArtworkFilter is a
+boxed/nullable type), which is exactly what     
+ArtworkSpecifications.build(...) needs: null means "this filter wasn't provided, skip it."
+
+### Testing filters
+
+I'm not testing the search method of the service (the one that filters) as it would involve mocking the db with
+@DataJpaTest. I'm postponing this for later.
 
