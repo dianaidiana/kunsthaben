@@ -50,6 +50,12 @@ public class ArtworkService {
     }
 
     @Transactional(readOnly = true)
+    public Page<ArtworkCardResponse> search(ArtworkFilter filter, Pageable pageable) {
+        return repository.findAll(ArtworkSpecifications.build(filter), pageable)
+                         .map(ArtworkCardResponse::from);
+    }
+
+    @Transactional(readOnly = true)
     public Page<ArtworkCardResponse> getUnsoldCardsByArtistId(Long artistId, Pageable pageable) {
         return repository.findAllByArtistIdAndDeletedAtIsNullAndSold(artistId, false, pageable)
                          .map(ArtworkCardResponse::from);

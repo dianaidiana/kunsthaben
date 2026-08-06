@@ -32,6 +32,14 @@ public class ArtworkController {
         return service.getAllCards(pageable);
     }
 
+    @GetMapping("/artwork/search")
+    Page<ArtworkCardResponse> search(
+            @ModelAttribute ArtworkFilter filter,
+            @PageableDefault(size = 20, sort = "createdAt", direction =
+                    Sort.Direction.DESC) Pageable pageable) {
+        return service.search(filter, pageable);
+    }
+
     @GetMapping("/user/{artistId}/artwork")
     Page<ArtworkCardResponse> getUnsoldCardsByArtistId(@PathVariable Long artistId, @PageableDefault(size = 20, sort = "createdAt", direction =
             Sort.Direction.DESC) Pageable pageable) {

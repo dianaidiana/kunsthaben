@@ -134,6 +134,8 @@ class ArtworkServiceTest {
         );
     }
 
+    //TODO: test filter search, using @DataJpaTest
+
     @Test
     void getDetailByExistentId() {
         when(repository.findByIdAndDeletedAtIsNull(1L)).thenReturn(Optional.of(olderArtwork));
