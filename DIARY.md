@@ -65,16 +65,18 @@ It has two constructors worth knowing:
 
 ### Fixing this warning:
 
+```
 For a stable JSON structure, please use Spring Data's PagedModel (globally via @EnableSpringDataWebSupport(
 pageSerializationMode = VIA_DTO)) or Spring HATEOAS and Spring Data's PagedResourcesAssembler as documented
 in https://docs.spring.io/spring-data/commons/reference/repositories/core-extensions.html#core.web.pageables.
+```
 
 As per this blogpost (Coding Steve): https://stevenpg.com/posts/spring-data-page-impl-serialization-warning/
 
-"This warning appears when you’re returning Page<T> objects directly from your REST controllers, and Spring is warning
-you that the JSON structure might change between versions."
+This warning appears when you’re returning Page<T> objects directly from your REST controllers, and Spring is warning
+you that the JSON structure might change between versions.
 
-and the fix: Use PagedModel
+and the fix:
 
 ```java
 
@@ -106,8 +108,8 @@ stable PagedModel format:
 
 ### I have no clue:
 
-how to test the content of a endpoint that returns a Page object. I'll come back to this later. For now, I'll just test
-the status.
+how to test the content of a endpoint that returns a Page object. For now, I'll just test
+the status as the response of the content is actually tested at service.
 
 ### Specification
 
