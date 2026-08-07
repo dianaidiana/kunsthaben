@@ -17,22 +17,22 @@ public class Frame {
     @Column(nullable = false)
     private boolean framed;
 
-    @Column(name = "dim_frame_x", columnDefinition = "NUMERIC(8,2) CHECK (dim_frame_x > 0)")
-    private Double dimX;
+    @Column(name = "dim_frame_width", columnDefinition = "NUMERIC(8,2) CHECK (dim_frame_width > 0)")
+    private Double width;
 
-    @Column(name = "dim_frame_y", columnDefinition = "NUMERIC(8,2) CHECK (dim_frame_y > 0)")
-    private Double dimY;
+    @Column(name = "dim_frame_height", columnDefinition = "NUMERIC(8,2) CHECK (dim_frame_height > 0)")
+    private Double height;
 
-    @Column(name = "dim_frame_z", columnDefinition = "NUMERIC(8,2) CHECK (dim_frame_z > 0)")
-    private Double dimZ;
+    @Column(name = "dim_frame_depth", columnDefinition = "NUMERIC(8,2) CHECK (dim_frame_depth > 0)")
+    private Double depth;
 
-    public static Frame of(boolean framed, Double dimX, Double dimY, Double dimZ) {
+    public static Frame of(boolean framed, Double width, Double height, Double depth) {
         if (!framed) {
             return new Frame(false, null, null, null);
         }
-        if (dimX == null || dimY == null || dimX <= 0 || dimY <= 0 || (dimZ != null && dimZ <= 0)) {
+        if (width == null || height == null || width <= 0 || height <= 0 || (depth != null && depth <= 0)) {
             throw new IllegalArgumentException(ErrorMessages.FRAME_DIMENSIONS_INVALID);
         }
-        return new Frame(true, dimX, dimY, dimZ);
+        return new Frame(true, width, height, depth);
     }
 }

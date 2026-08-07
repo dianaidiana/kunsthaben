@@ -29,6 +29,7 @@ public class Artwork {
     private Long id;
 
     @ManyToOne
+    @JoinColumn(name = "artist_id", nullable = false)
     @OnDelete(action = OnDeleteAction.CASCADE)
     private User artist;
 
@@ -81,8 +82,8 @@ public class Artwork {
     @Column
     private OffsetDateTime deletedAt;
 
-    @Column
-    private OffsetDateTime soldAt;
+    @Column(columnDefinition = "BOOLEAN DEFAULT false")
+    private boolean sold;
 
     @Column(columnDefinition = "BOOLEAN DEFAULT false")
     private boolean reserved;
@@ -90,4 +91,9 @@ public class Artwork {
     @OneToMany(mappedBy = "artwork", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("sortOrder ASC")
     private List<ArtworkImage> images = new ArrayList<>();
+
+    public void addImage(ArtworkImage image) {
+        images.add(image);
+        image.setArtwork(this);
+    }
 }

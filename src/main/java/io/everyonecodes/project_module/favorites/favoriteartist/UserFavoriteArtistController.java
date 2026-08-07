@@ -1,4 +1,4 @@
-package io.everyonecodes.project_module.favorites.favoriteArtist;
+package io.everyonecodes.project_module.favorites.favoriteartist;
 
 import io.everyonecodes.project_module.users.UserResponse;
 import org.springframework.web.bind.annotation.*;

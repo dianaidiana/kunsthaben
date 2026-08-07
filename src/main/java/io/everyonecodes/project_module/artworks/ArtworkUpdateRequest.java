@@ -8,6 +8,9 @@ import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.validator.constraints.URL;
+
+import java.util.List;
 
 @AllArgsConstructor
 @Getter
@@ -57,4 +60,5 @@ public class ArtworkUpdateRequest {
 
     private Long mediumId;
     private Long supportId;
+
 }

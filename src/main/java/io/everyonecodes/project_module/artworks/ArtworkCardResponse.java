@@ -23,6 +23,31 @@ public class ArtworkCardResponse {
     private String mediaName;
     private String supportName;
     private double price;
+    private boolean sold;
     private boolean reserved;
     private OffsetDateTime createdAt;
+
+    public static ArtworkCardResponse from(Artwork artwork) {
+        var category = artwork.getCategory();
+        var media = artwork.getMedia();
+        var support = artwork.getSupport();
+        var images = artwork.getImages();
+        var imageUrl = images.isEmpty() ? null : images.getFirst().getUrl();
+
+        return new ArtworkCardResponse(
+                artwork.getId(),
+                imageUrl,
+                artwork.getTitle(),
+                artwork.getArtist().getName(),
+                artwork.getYear(),
+                category != null ? category.getCode() : null,
+                category != null ? category.getName() : null,
+                media != null ? media.getName() : null,
+                support != null ? support.getName() : null,
+                artwork.getPrice(),
+                artwork.isSold(),
+                artwork.isReserved(),
+                artwork.getCreatedAt()
+        );
+    }
 }

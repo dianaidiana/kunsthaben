@@ -1,4 +1,4 @@
-package io.everyonecodes.project_module.favorites.favoriteArtist;
+package io.everyonecodes.project_module.favorites.favoriteartist;
 
 import io.everyonecodes.project_module.exceptions.BadRequestException;
 import io.everyonecodes.project_module.exceptions.ConflictException;

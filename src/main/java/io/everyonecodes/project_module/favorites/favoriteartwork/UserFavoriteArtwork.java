@@ -1,5 +1,6 @@
-package io.everyonecodes.project_module.favorites.favoriteArtist;
+package io.everyonecodes.project_module.favorites.favoriteartwork;
 
+import io.everyonecodes.project_module.artworks.Artwork;
 import io.everyonecodes.project_module.users.User;
 import jakarta.persistence.*;
 import lombok.*;
@@ -14,11 +15,10 @@ import java.time.OffsetDateTime;
 @Setter
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 @NoArgsConstructor
-@Table(check = @CheckConstraint(constraint = "user_id <> artist_id"))
-public class UserFavoriteArtist {
+public class UserFavoriteArtwork {
 
     @EmbeddedId
-    private UserFavoriteArtistId id;
+    private UserFavoriteArtworkId id;
 
     @ManyToOne
     @MapsId("userId") // links the Object (User) to the ID in the composite key.
@@ -27,18 +27,18 @@ public class UserFavoriteArtist {
     private User user;
 
     @ManyToOne
-    @MapsId("artistId")
-    @JoinColumn(name = "artist_id")
+    @MapsId("artworkId")
+    @JoinColumn(name = "artwork_id")
     @OnDelete(action = OnDeleteAction.CASCADE)
-    private User artist;
+    private Artwork artwork;
 
     @Column(updatable = false)
     @CreationTimestamp
     private OffsetDateTime createdAt;
 
-    public UserFavoriteArtist(User user, User artist) {
-        this.id = new UserFavoriteArtistId(user.getId(), artist.getId());
+    public UserFavoriteArtwork(User user, Artwork artwork) {
+        this.id = new UserFavoriteArtworkId(user.getId(), artwork.getId());
         this.user = user;
-        this.artist = artist;
+        this.artwork = artwork;
     }
 }

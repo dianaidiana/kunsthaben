@@ -14,19 +14,19 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 public class Dimensions {
 
-    @Column(name = "dim_x", columnDefinition = "NUMERIC(8,2) CHECK (dim_x > 0)", nullable = false)
-    private double x;
+    @Column(name = "dim_width", columnDefinition = "NUMERIC(8,2) CHECK (dim_width > 0)", nullable = false)
+    private double width;
 
-    @Column(name = "dim_y", columnDefinition = "NUMERIC(8,2) CHECK (dim_y > 0)", nullable = false)
-    private double y;
+    @Column(name = "dim_height", columnDefinition = "NUMERIC(8,2) CHECK (dim_height > 0)", nullable = false)
+    private double height;
 
-    @Column(name = "dim_z", columnDefinition = "NUMERIC(8,2) CHECK (dim_z > 0)")
-    private Double z;
+    @Column(name = "dim_depth", columnDefinition = "NUMERIC(8,2) CHECK (dim_depth > 0)")
+    private Double depth;
 
-    public static Dimensions of(double x, double y, Double z) {
-        if (x <= 0 || y <= 0 || (z != null && z <= 0)) {
+    public static Dimensions of(double width, double height, Double depth) {
+        if (width <= 0 || height <= 0 || (depth != null && depth <= 0)) {
             throw new IllegalArgumentException(ErrorMessages.DIMENSIONS_INVALID);
         }
-        return new Dimensions(x, y, z);
+        return new Dimensions(width, height, depth);
     }
 }

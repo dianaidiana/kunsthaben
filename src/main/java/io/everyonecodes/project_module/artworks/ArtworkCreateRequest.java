@@ -8,9 +8,6 @@ import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
-import org.hibernate.validator.constraints.URL;
-
-import java.util.List;
 
 @AllArgsConstructor
 @Getter
@@ -60,6 +57,4 @@ public class ArtworkCreateRequest {
 
     private Long mediumId;
     private Long supportId;
-
-    private List<@URL(message = ErrorMessages.IMAGE_URL_INVALID) String> imageUrls;
 }

@@ -73,13 +73,13 @@ CREATE TABLE IF NOT EXISTS artworks
     description TEXT           NOT NULL,
     city        TEXT           NOT NULL,
     postcode    TEXT           NOT NULL,
-    dim_x       NUMERIC(8, 2)  NOT NULL,
-    dim_y       NUMERIC(8, 2)  NOT NULL,
-    dim_z       NUMERIC(8, 2),
-    framed      BOOLEAN        NOT NULL,
-    dim_frame_x NUMERIC(8, 2),
-    dim_frame_y NUMERIC(8, 2),
-    dim_frame_z NUMERIC(8, 2),
+    dim_width       NUMERIC(8, 2)  NOT NULL,
+    dim_height      NUMERIC(8, 2)  NOT NULL,
+    dim_depth       NUMERIC(8, 2),
+    framed          BOOLEAN        NOT NULL,
+    dim_frame_width  NUMERIC(8, 2),
+    dim_frame_height NUMERIC(8, 2),
+    dim_frame_depth  NUMERIC(8, 2),
     category_id INTEGER        REFERENCES categories (id) ON DELETE SET NULL,
     medium_id   INTEGER        REFERENCES media (id) ON DELETE SET NULL,
     support_id  INTEGER        REFERENCES supports (id) ON DELETE SET NULL,
@@ -88,10 +88,10 @@ CREATE TABLE IF NOT EXISTS artworks
     sold_at     TIMESTAMPTZ,
     reserved    BOOLEAN     DEFAULT false,
     CONSTRAINT check_framed CHECK (
-        (framed = FALSE AND dim_frame_x IS NULL AND dim_frame_y IS NULL AND dim_frame_z IS NULL)
+        (framed = FALSE AND dim_frame_width IS NULL AND dim_frame_height IS NULL AND dim_frame_depth IS NULL)
             OR
-        (framed = TRUE AND dim_frame_x IS NOT NULL AND dim_frame_y IS NOT NULL)
-        -- dim_frame_z can be null even if framed
+        (framed = TRUE AND dim_frame_width IS NOT NULL AND dim_frame_height IS NOT NULL)
+        -- dim_frame_depth can be null even if framed
         )
 );
 
