@@ -14,6 +14,10 @@ public final class ErrorMessages {
 
     public static final String NOT_ARTWORK_OWNER = "You do not have permission to modify this artwork";
 
+    public static final String TOO_MANY_IMAGES = "The number of images has reached a limit";
+    public static final String IMAGES_DO_NOT_MATCH = "Can't reorder images as set of images don't match";
+    public static final String IMAGE_NOT_FOUND = "Image not found";
+
     public static final String EMAIL_ALREADY_TAKEN = "email is already taken";
 
     public static final String NAME_REQUIRED = "name should not be empty";
