@@ -1,5 +1,6 @@
-package io.everyonecodes.project_module.artworks;
+package io.everyonecodes.project_module.artworks.filters;
 
+import io.everyonecodes.project_module.artworks.Artwork;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.util.Arrays;

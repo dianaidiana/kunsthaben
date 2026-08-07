@@ -2,6 +2,9 @@ package io.everyonecodes.project_module.users;
 
 import io.everyonecodes.project_module.exceptions.ConflictException;
 import io.everyonecodes.project_module.exceptions.NotFoundException;
+import io.everyonecodes.project_module.users.dto.UserRegisterRequest;
+import io.everyonecodes.project_module.users.dto.UserResponse;
+import io.everyonecodes.project_module.users.dto.UserUpdateRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

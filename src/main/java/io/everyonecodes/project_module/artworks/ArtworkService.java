@@ -1,5 +1,13 @@
 package io.everyonecodes.project_module.artworks;
 
+import io.everyonecodes.project_module.artworks.dimensions.Dimensions;
+import io.everyonecodes.project_module.artworks.dimensions.Frame;
+import io.everyonecodes.project_module.artworks.dto.ArtworkCardResponse;
+import io.everyonecodes.project_module.artworks.dto.ArtworkCreateRequest;
+import io.everyonecodes.project_module.artworks.dto.ArtworkDetailResponse;
+import io.everyonecodes.project_module.artworks.dto.ArtworkUpdateRequest;
+import io.everyonecodes.project_module.artworks.filters.ArtworkFilter;
+import io.everyonecodes.project_module.artworks.filters.ArtworkSpecifications;
 import io.everyonecodes.project_module.classification.category.Category;
 import io.everyonecodes.project_module.classification.category.CategoryRepository;
 import io.everyonecodes.project_module.classification.media.Media;
@@ -17,7 +25,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
-import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -129,7 +136,7 @@ public class ArtworkService {
         return ArtworkDetailResponse.from(artwork);
     }
 
-    private Artwork fetchOwnedArtwork(Long artistId, Long artworkId) {
+    public Artwork fetchOwnedArtwork(Long artistId, Long artworkId) {
         var artwork = repository.findByIdAndDeletedAtIsNull(artworkId)
                                 .orElseThrow(() -> new NotFoundException(ErrorMessages.ARTWORK_NOT_FOUND));
 

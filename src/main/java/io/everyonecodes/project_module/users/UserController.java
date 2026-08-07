@@ -2,9 +2,10 @@ package io.everyonecodes.project_module.users;
 
 import io.everyonecodes.project_module.exceptions.ErrorMessages;
 import io.everyonecodes.project_module.exceptions.NotFoundException;
+import io.everyonecodes.project_module.users.dto.UserRegisterRequest;
+import io.everyonecodes.project_module.users.dto.UserResponse;
+import io.everyonecodes.project_module.users.dto.UserUpdateRequest;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.Positive;
-import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 
 @RestController

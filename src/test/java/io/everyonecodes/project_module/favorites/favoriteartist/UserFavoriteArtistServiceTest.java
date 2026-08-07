@@ -5,7 +5,7 @@ import io.everyonecodes.project_module.exceptions.ConflictException;
 import io.everyonecodes.project_module.exceptions.NotFoundException;
 import io.everyonecodes.project_module.users.User;
 import io.everyonecodes.project_module.users.UserRepository;
-import io.everyonecodes.project_module.users.UserResponse;
+import io.everyonecodes.project_module.users.dto.UserResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
