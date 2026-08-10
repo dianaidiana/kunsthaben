@@ -119,14 +119,24 @@ filter wasn't provided:
 
 ```java
 public static Specification<Artwork> hasMinPrice(Double minPrice) {
-    if (minPrice == null) return null;
+    if (minPrice == null) return Specification.unrestricted();
     return (root, query, cb) -> cb.greaterThanOrEqualTo(root.get("price"), minPrice);
 }
 ```
 
-`Specification.where(x).and(y)` is written specifically so that a `null` Specification just gets
-skipped, not treated as an error. That's what lets me chain a dozen optional filters together and
-only the ones actually provided end up in the final `WHERE` clause:
+**Correction (10.08):** I originally wrote `return null;` here, believing
+`Specification.where(x).and(y)` treated a `null` Specification as "skip this one". That was true
+in older Spring Data versions, but this project is on Spring Data JPA 4.1.0, where
+`Specification.and(other)` now does `Assert.notNull(other, "Other specification must not be
+null")` — passing `null` throws instead of being skipped. Any filter request leaving a field unset
+(so its `hasX` method returned `null`) blew up with `Other specification must not be null`. The
+fix is the new `Specification.unrestricted()` static factory (added in 4.0), a no-op specification
+meant exactly for this: it always returns a `null` *predicate*, which composition does still treat
+as "doesn't contribute" — the null-tolerance moved from the `Specification` reference itself to
+the `Predicate` it produces.
+
+`Specification.where(x).and(y)` is what lets me chain a dozen optional filters together and only
+the ones actually provided end up in the final `WHERE` clause:
 
 ```
 Specification.where(isNotDeleted())
