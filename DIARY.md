@@ -1,5 +1,24 @@
 # Diary of my project (or what I've learnt today):
 
+## 07.08 Concurrency: why `@Transactional` doesn't prevent race conditions
+
+`ArtworkImageService.addImage`'s cap check (`MAX_IMAGES_PER_ARTWORK`) is a classic
+check-then-act race: two concurrent requests for the same artwork can each read
+`count = 9`, both pass the check before either commits, and both insert — ending up
+with 11 images even though the limit is 10.
+Although `@Transactional` gives atomicity (all your own writes commit together or not at all) and isolation from
+uncommitted changes of other transactions, it does not make
+concurrent calls to the same method run one at a time. Two transactions can each read
+"count = 9" at the same instant, because neither has committed yet when the other reads.
+
+### Pessimistic write
+
+Pessimistic locking on the `Artwork` row before the count check, e.g. a repository
+method annotated `@Lock(LockModeType.PESSIMISTIC_WRITE)`, would force a second
+concurrent `addImage` call for the *same* artwork to block until the first transaction
+commits (other artworks are unaffected, since the lock is per-row).
+I'm skipping this fix for later.
+
 ## 06.08 Pagination and Specification
 
 ### Pagination
