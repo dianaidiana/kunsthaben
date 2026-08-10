@@ -1,5 +1,8 @@
 package io.everyonecodes.project_module.artworks;
 
+import io.everyonecodes.project_module.artworkimages.ArtworkImage;
+import io.everyonecodes.project_module.artworks.dimensions.Dimensions;
+import io.everyonecodes.project_module.artworks.dimensions.Frame;
 import io.everyonecodes.project_module.classification.category.Category;
 import io.everyonecodes.project_module.classification.media.Media;
 import io.everyonecodes.project_module.classification.support.Support;
@@ -88,12 +91,7 @@ public class Artwork {
     @Column(columnDefinition = "BOOLEAN DEFAULT false")
     private boolean reserved;
 
-    @OneToMany(mappedBy = "artwork", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "artwork")
     @OrderBy("sortOrder ASC")
     private List<ArtworkImage> images = new ArrayList<>();
-
-    public void addImage(ArtworkImage image) {
-        images.add(image);
-        image.setArtwork(this);
-    }
 }

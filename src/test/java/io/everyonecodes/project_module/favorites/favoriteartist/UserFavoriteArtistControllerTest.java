@@ -4,7 +4,7 @@ import io.everyonecodes.project_module.exceptions.BadRequestException;
 import io.everyonecodes.project_module.exceptions.ConflictException;
 import io.everyonecodes.project_module.exceptions.ErrorMessages;
 import io.everyonecodes.project_module.exceptions.NotFoundException;
-import io.everyonecodes.project_module.users.UserResponse;
+import io.everyonecodes.project_module.users.dto.UserResponse;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureRestTestClient;

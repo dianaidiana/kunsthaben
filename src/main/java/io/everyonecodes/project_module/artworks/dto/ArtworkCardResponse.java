@@ -1,5 +1,6 @@
-package io.everyonecodes.project_module.artworks;
+package io.everyonecodes.project_module.artworks.dto;
 
+import io.everyonecodes.project_module.artworks.Artwork;
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;

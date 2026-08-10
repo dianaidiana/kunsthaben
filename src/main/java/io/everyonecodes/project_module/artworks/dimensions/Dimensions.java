@@ -1,4 +1,4 @@
-package io.everyonecodes.project_module.artworks;
+package io.everyonecodes.project_module.artworks.dimensions;
 
 import io.everyonecodes.project_module.exceptions.ErrorMessages;
 import jakarta.persistence.Column;

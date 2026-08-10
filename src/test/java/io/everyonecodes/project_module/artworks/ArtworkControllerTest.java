@@ -1,5 +1,9 @@
 package io.everyonecodes.project_module.artworks;
 
+import io.everyonecodes.project_module.artworks.dto.ArtworkCardResponse;
+import io.everyonecodes.project_module.artworks.dto.ArtworkCreateRequest;
+import io.everyonecodes.project_module.artworks.dto.ArtworkDetailResponse;
+import io.everyonecodes.project_module.artworks.dto.ArtworkUpdateRequest;
 import io.everyonecodes.project_module.exceptions.ErrorMessages;
 import io.everyonecodes.project_module.exceptions.ForbiddenException;
 import io.everyonecodes.project_module.exceptions.NotFoundException;

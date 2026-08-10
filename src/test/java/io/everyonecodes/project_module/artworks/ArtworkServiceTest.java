@@ -1,5 +1,11 @@
 package io.everyonecodes.project_module.artworks;
 
+import io.everyonecodes.project_module.artworks.dimensions.Dimensions;
+import io.everyonecodes.project_module.artworks.dimensions.Frame;
+import io.everyonecodes.project_module.artworks.dto.ArtworkCardResponse;
+import io.everyonecodes.project_module.artworks.dto.ArtworkCreateRequest;
+import io.everyonecodes.project_module.artworks.dto.ArtworkDetailResponse;
+import io.everyonecodes.project_module.artworks.dto.ArtworkUpdateRequest;
 import io.everyonecodes.project_module.classification.category.Category;
 import io.everyonecodes.project_module.classification.category.CategoryRepository;
 import io.everyonecodes.project_module.classification.enums.CategoryEnum;

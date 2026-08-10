@@ -5,7 +5,7 @@ import io.everyonecodes.project_module.exceptions.ConflictException;
 import io.everyonecodes.project_module.exceptions.ErrorMessages;
 import io.everyonecodes.project_module.exceptions.NotFoundException;
 import io.everyonecodes.project_module.users.UserRepository;
-import io.everyonecodes.project_module.users.UserResponse;
+import io.everyonecodes.project_module.users.dto.UserResponse;
 import org.springframework.stereotype.Service;
 
 import java.util.List;

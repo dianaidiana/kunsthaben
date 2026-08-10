@@ -1,4 +1,4 @@
-package io.everyonecodes.project_module.artworks;
+package io.everyonecodes.project_module.artworks.filters;
 
 import lombok.Getter;
 import lombok.NoArgsConstructor;

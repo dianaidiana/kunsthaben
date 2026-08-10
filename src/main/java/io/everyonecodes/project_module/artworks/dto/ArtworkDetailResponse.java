@@ -1,5 +1,7 @@
-package io.everyonecodes.project_module.artworks;
+package io.everyonecodes.project_module.artworks.dto;
 
+import io.everyonecodes.project_module.artworkimages.ArtworkImage;
+import io.everyonecodes.project_module.artworks.Artwork;
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -49,7 +51,7 @@ public class ArtworkDetailResponse {
     private boolean reserved;
     private OffsetDateTime createdAt;
 
-    private List<String> imageUrls;
+    private List<ArtworkImage> imageUrls;
 
     public static ArtworkDetailResponse from(Artwork artwork) {
         var dimensions = artwork.getDimensions();
@@ -87,7 +89,7 @@ public class ArtworkDetailResponse {
                 artwork.isSold(),
                 artwork.isReserved(),
                 artwork.getCreatedAt(),
-                artwork.getImages().stream().map(ArtworkImage::getUrl).toList()
+                artwork.getImages()
         );
     }
 }

@@ -1,6 +1,6 @@
 package io.everyonecodes.project_module.favorites.favoriteartist;
 
-import io.everyonecodes.project_module.users.UserResponse;
+import io.everyonecodes.project_module.users.dto.UserResponse;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;

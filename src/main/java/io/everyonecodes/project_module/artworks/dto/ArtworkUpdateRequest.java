@@ -1,4 +1,4 @@
-package io.everyonecodes.project_module.artworks;
+package io.everyonecodes.project_module.artworks.dto;
 
 import io.everyonecodes.project_module.exceptions.ErrorMessages;
 import jakarta.validation.constraints.NotBlank;
@@ -13,7 +13,7 @@ import lombok.Setter;
 @Getter
 @Setter
 @EqualsAndHashCode
-public class ArtworkCreateRequest {
+public class ArtworkUpdateRequest {
     @NotBlank(message = ErrorMessages.TITLE_REQUIRED)
     private String title;
 
@@ -57,4 +57,5 @@ public class ArtworkCreateRequest {
 
     private Long mediumId;
     private Long supportId;
+
 }

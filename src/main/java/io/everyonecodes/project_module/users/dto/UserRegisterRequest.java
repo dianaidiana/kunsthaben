@@ -1,4 +1,4 @@
-package io.everyonecodes.project_module.users;
+package io.everyonecodes.project_module.users.dto;
 
 import io.everyonecodes.project_module.exceptions.ErrorMessages;
 import jakarta.validation.constraints.Email;

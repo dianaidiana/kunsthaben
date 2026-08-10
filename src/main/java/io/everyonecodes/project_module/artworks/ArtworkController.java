@@ -1,5 +1,10 @@
 package io.everyonecodes.project_module.artworks;
 
+import io.everyonecodes.project_module.artworks.dto.ArtworkCardResponse;
+import io.everyonecodes.project_module.artworks.dto.ArtworkCreateRequest;
+import io.everyonecodes.project_module.artworks.dto.ArtworkDetailResponse;
+import io.everyonecodes.project_module.artworks.dto.ArtworkUpdateRequest;
+import io.everyonecodes.project_module.artworks.filters.ArtworkFilter;
 import io.everyonecodes.project_module.exceptions.ErrorMessages;
 import io.everyonecodes.project_module.exceptions.NotFoundException;
 import jakarta.validation.Valid;
@@ -8,8 +13,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 public class ArtworkController {
