@@ -31,9 +31,6 @@ import static org.mockito.Mockito.when;
 @AutoConfigureRestTestClient
 class ArtworkControllerTest {
 
-    @Autowired
-    ArtworkController controller;
-
     @MockitoBean
     ArtworkService service;
 

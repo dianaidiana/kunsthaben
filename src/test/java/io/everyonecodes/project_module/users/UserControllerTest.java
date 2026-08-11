@@ -27,9 +27,6 @@ import static org.mockito.Mockito.when;
 @AutoConfigureRestTestClient
 public class UserControllerTest {
 
-    @Autowired
-    UserController controller;
-
     @MockitoBean
     UserService service;
 
