@@ -19,7 +19,7 @@ public class ArtworkImageService {
     private final ArtworkImageRepository repository;
     private final ArtworkService artworkService;
 
-    private static final int MAX_IMAGES_PER_ARTWORK = 10;
+    public static final int MAX_IMAGES_PER_ARTWORK = 10;
 
     public ArtworkImageService(ArtworkImageRepository repository, ArtworkService artworkService) {
         this.repository = repository;
@@ -81,6 +81,4 @@ public class ArtworkImageService {
         repository.delete(image);
         reorderImages(artistId, artworkId, remainingIds);
     }
-
-
 }
