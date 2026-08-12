@@ -37,7 +37,7 @@ public final class ErrorMessages {
     public static final String DESCRIPTION_REQUIRED = "description should not be empty";
     public static final String URL_REQUIRED = "url should not be empty";
     public static final String SORT_ORDER_INVALID = "sort order must be zero or positive";
-    public static final String IMAGE_URL_INVALID = "image URL must be valid";
+    public static final String INVALID_IMAGE_FILE = "The provided image file is invalid";
 
     public static final String FRAME_DIMENSIONS_INVALID = "Frame dimensions must be positive";
     public static final String DIMENSIONS_INVALID = "Dimensions must be positive";

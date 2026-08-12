@@ -1,16 +1,18 @@
 package io.everyonecodes.project_module.artworkimages;
 
-import io.everyonecodes.project_module.artworkimages.dto.ArtworkImageRequest;
 import io.everyonecodes.project_module.artworks.ArtworkService;
 import io.everyonecodes.project_module.exceptions.BadRequestException;
 import io.everyonecodes.project_module.exceptions.ErrorMessages;
 import io.everyonecodes.project_module.exceptions.NotFoundException;
+import io.everyonecodes.project_module.storage.S3StorageService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -18,23 +20,34 @@ public class ArtworkImageService {
 
     private final ArtworkImageRepository repository;
     private final ArtworkService artworkService;
+    private final S3StorageService s3StorageService;
+
+    private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of("image/jpeg", "image/png", "image/webp");
 
     public static final int MAX_IMAGES_PER_ARTWORK = 10;
 
-    public ArtworkImageService(ArtworkImageRepository repository, ArtworkService artworkService) {
+    public ArtworkImageService(ArtworkImageRepository repository, ArtworkService artworkService, S3StorageService s3StorageService) {
         this.repository = repository;
         this.artworkService = artworkService;
+        this.s3StorageService = s3StorageService;
     }
 
     @Transactional
-    public ArtworkImage addImage(Long artistId, Long artworkId, ArtworkImageRequest request) {
+    public ArtworkImage addImage(Long artistId, Long artworkId, MultipartFile file) {
         var artwork = artworkService.fetchOwnedArtwork(artistId, artworkId);
         var currentCount = repository.countByArtworkId(artworkId);
+
         if (currentCount >= MAX_IMAGES_PER_ARTWORK) {
             throw new BadRequestException(ErrorMessages.TOO_MANY_IMAGES);
         }
 
-        return repository.save(new ArtworkImage(null, artwork, request.getUrl(), currentCount));
+        if (file.isEmpty() || !ALLOWED_CONTENT_TYPES.contains(file.getContentType())) {
+            throw new BadRequestException(ErrorMessages.INVALID_IMAGE_FILE);
+        }
+
+        var url = s3StorageService.uploadFile(file);
+
+        return repository.save(new ArtworkImage(null, artwork, url, currentCount));
     }
 
     @Transactional

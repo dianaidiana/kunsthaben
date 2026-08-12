@@ -34,7 +34,7 @@ public class ArtworkImage {
 
     @Column(columnDefinition = "TEXT", nullable = false)
     @NotBlank(message = ErrorMessages.URL_REQUIRED)
-    @URL(message = ErrorMessages.IMAGE_URL_INVALID)
+    @URL(message = ErrorMessages.INVALID_IMAGE_FILE)
     private String url;
 
     @Column(name = "sort_order", nullable = false)
