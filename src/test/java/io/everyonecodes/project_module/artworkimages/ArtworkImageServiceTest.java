@@ -1,6 +1,6 @@
 package io.everyonecodes.project_module.artworkimages;
 
-import io.everyonecodes.project_module.artworkimages.dto.ArtworkImageRequest;
+
 import io.everyonecodes.project_module.artworks.Artwork;
 import io.everyonecodes.project_module.artworks.ArtworkService;
 import io.everyonecodes.project_module.artworks.dimensions.Dimensions;
@@ -15,12 +15,14 @@ import io.everyonecodes.project_module.exceptions.BadRequestException;
 import io.everyonecodes.project_module.exceptions.ErrorMessages;
 import io.everyonecodes.project_module.exceptions.ForbiddenException;
 import io.everyonecodes.project_module.exceptions.NotFoundException;
+import io.everyonecodes.project_module.storage.S3StorageService;
 import io.everyonecodes.project_module.users.User;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.mock.web.MockMultipartFile;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -42,9 +44,12 @@ class ArtworkImageServiceTest {
     @Mock
     ArtworkService artworkService;
 
+    @Mock
+    S3StorageService s3StorageService;
+
     @BeforeEach
     void setup() {
-        service = new ArtworkImageService(repository, artworkService);
+        service = new ArtworkImageService(repository, artworkService, s3StorageService);
     }
 
     private final OffsetDateTime createdAt = OffsetDateTime.parse("2024-01-01T09:15:30Z");
@@ -78,6 +83,13 @@ class ArtworkImageServiceTest {
             new ArrayList<>()
     );
 
+    private final MockMultipartFile file = new MockMultipartFile(
+            "file",                       // the request-param name (matches @RequestParam("file"))
+            "painting.jpg",                     // original filename
+            "image/jpeg",                       // content type
+            "fake image bytes".getBytes()       // actual file content, as bytes
+    );
+
     private final ArtworkImage artworkImage1 = new ArtworkImage(1L, artwork, "urlurl1.com", 0);
     private final ArtworkImage artworkImage2 = new ArtworkImage(2L, artwork, "urlurl2.com", 1);
     private final ArtworkImage artworkImage3 = new ArtworkImage(3L, artwork, "urlurl3.com", 2);
@@ -87,7 +99,7 @@ class ArtworkImageServiceTest {
         Long artistId = 1L;
         Long artworkId = 1L;
         when(artworkService.fetchOwnedArtwork(artistId, artworkId)).thenThrow(new NotFoundException(ErrorMessages.ARTWORK_NOT_FOUND));
-        assertThrows(NotFoundException.class, () -> service.addImage(artistId, artworkId, new ArtworkImageRequest("url.com")));
+        assertThrows(NotFoundException.class, () -> service.addImage(artistId, artworkId, file));
     }
 
     @Test
@@ -95,7 +107,7 @@ class ArtworkImageServiceTest {
         Long artistId = 1L;
         Long artworkId = 1L;
         when(artworkService.fetchOwnedArtwork(artistId, artworkId)).thenThrow(new ForbiddenException(ErrorMessages.NOT_ARTWORK_OWNER));
-        assertThrows(ForbiddenException.class, () -> service.addImage(artistId, artworkId, new ArtworkImageRequest("url.com")));
+        assertThrows(ForbiddenException.class, () -> service.addImage(artistId, artworkId, file));
     }
 
     @Test
@@ -103,16 +115,17 @@ class ArtworkImageServiceTest {
         Long artistId = 1L;
         Long artworkId = 1L;
         when(repository.countByArtworkId(artworkId)).thenReturn(ArtworkImageService.MAX_IMAGES_PER_ARTWORK);
-        assertThrows(BadRequestException.class, () -> service.addImage(artistId, artworkId, new ArtworkImageRequest("url.com")));
+        assertThrows(BadRequestException.class, () -> service.addImage(artistId, artworkId, file));
     }
 
     @Test
     void addImageAtMaxBoundarySucceeds() {
         when(artworkService.fetchOwnedArtwork(user.getId(), artwork.getId())).thenReturn(artwork);
         when(repository.countByArtworkId(artwork.getId())).thenReturn(ArtworkImageService.MAX_IMAGES_PER_ARTWORK - 1);
+        when(s3StorageService.uploadFile(file)).thenReturn("https://bucket.s3.region.amazonaws.com/key.jpg");
         when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        ArtworkImage image = service.addImage(user.getId(), artwork.getId(), new ArtworkImageRequest("urlurl.com"));
+        ArtworkImage image = service.addImage(user.getId(), artwork.getId(), file);
         assertEquals(ArtworkImageService.MAX_IMAGES_PER_ARTWORK - 1, image.getSortOrder());
     }
 
@@ -121,14 +134,15 @@ class ArtworkImageServiceTest {
         artwork.getImages().add(artworkImage1);
         when(artworkService.fetchOwnedArtwork(user.getId(), artworkImage1.getId())).thenReturn(artwork);
         when(repository.countByArtworkId(artwork.getId())).thenReturn(1);
+        when(s3StorageService.uploadFile(file)).thenReturn("https://bucket.s3.region.amazonaws.com/key.jpg");
         when(repository.save(any())).thenAnswer(invocation -> {
             ArtworkImage savedImage = invocation.getArgument(0);
             savedImage.setId(2L);
             return savedImage;
         });
 
-        ArtworkImage image = service.addImage(user.getId(), artwork.getId(), new ArtworkImageRequest("urlurl.com"));
-        assertEquals(new ArtworkImage(2L, artwork, "urlurl.com", 1), image);
+        ArtworkImage image = service.addImage(user.getId(), artwork.getId(), file);
+        assertEquals(new ArtworkImage(2L, artwork, "https://bucket.s3.region.amazonaws.com/key.jpg", 1), image);
     }
 
     @Test
