@@ -1,6 +1,6 @@
 package io.everyonecodes.project_module.artworkimages;
 
-import io.everyonecodes.project_module.artworkimages.dto.ArtworkImageRequest;
+
 import io.everyonecodes.project_module.exceptions.BadRequestException;
 import io.everyonecodes.project_module.exceptions.ErrorMessages;
 import io.everyonecodes.project_module.exceptions.ForbiddenException;
@@ -9,10 +9,14 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureRestTestClient;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.MultipartBodyBuilder;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.client.RestTestClient;
 
+import java.io.IOException;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -32,17 +36,33 @@ class ArtworkImageControllerTest {
     @Autowired
     RestTestClient client;
 
-    private final ArtworkImage expectedImage = new ArtworkImage(2L, null, "urlurl.com", 1);
-    private final ArtworkImageRequest validRequest = new ArtworkImageRequest("http://urlurl.com");
+    private final MultipartBodyBuilder builder = new MultipartBodyBuilder();
+
+    private final ArtworkImage expectedImage = new ArtworkImage(2L, null, "https://bucket.s3.region.amazonaws.com/key.jpg", 1);
+
+    private final MockMultipartFile file = new MockMultipartFile(
+            "file",                       // the request-param name (matches @RequestParam("file"))
+            "painting.jpg",                     // original filename
+            "image/jpeg",                       // content type
+            "fake image bytes".getBytes()       // actual file content, as bytes
+    );
 
     @Test
-    void addImageSuccessfully() {
-        when(service.addImage(eq(1L), eq(1L), any())).thenReturn(expectedImage);
+    void addImageSuccessfully() throws IOException {
+        builder.part("file", new ByteArrayResource(file.getBytes()) {
+                   @Override
+                   public String getFilename() {
+                       return file.getOriginalFilename();
+                   }
+               })
+               .contentType(MediaType.IMAGE_JPEG);
+
+        when(service.addImage(eq(1L), eq(1L), file)).thenReturn(expectedImage);
 
         ArtworkImage response = client.post()
                                       .uri("/user/1/artwork/1/images")
-                                      .contentType(MediaType.APPLICATION_JSON)
-                                      .body(validRequest)
+                                      .contentType(MediaType.MULTIPART_FORM_DATA)
+                                      .body(builder.build())
                                       .exchange()
                                       .expectStatus().isOk()
                                       .expectBody(ArtworkImage.class)
@@ -53,47 +73,87 @@ class ArtworkImageControllerTest {
     }
 
     @Test
-    void addImageWithInvalidUrl() {
+    void addImageWithInvalidFile() throws IOException {
+        MockMultipartFile invalidFile = new MockMultipartFile(
+                "file",                       // the request-param name (matches @RequestParam("file"))
+                "painting.pdf",                     // original filename
+                "application/pdf",                       // content type
+                "fake bytes".getBytes()       // actual file content, as bytes
+        );
+
+        builder.part("file", new ByteArrayResource(invalidFile.getBytes()) {
+            @Override
+            public String getFilename() {
+                return invalidFile.getOriginalFilename();
+            }
+        });
+
+        when(service.addImage(eq(1L), eq(1L), any())).thenThrow(new BadRequestException(ErrorMessages.INVALID_IMAGE_FILE));
+
         client.post()
               .uri("/user/1/artwork/1/images")
-              .contentType(MediaType.APPLICATION_JSON)
-              .body(new ArtworkImageRequest("not-a-url"))
+              .contentType(MediaType.MULTIPART_FORM_DATA)
+              .body(builder.build())
               .exchange()
               .expectStatus().isBadRequest();
     }
 
     @Test
-    void addImageToUnexistentArtwork() {
+    void addImageToUnexistentArtwork() throws IOException {
+        builder.part("file", new ByteArrayResource(file.getBytes()) {
+                   @Override
+                   public String getFilename() {
+                       return file.getOriginalFilename();
+                   }
+               })
+               .contentType(MediaType.IMAGE_JPEG);
+
         when(service.addImage(eq(1L), eq(1L), any())).thenThrow(new NotFoundException(ErrorMessages.ARTWORK_NOT_FOUND));
 
         client.post()
               .uri("/user/1/artwork/1/images")
-              .contentType(MediaType.APPLICATION_JSON)
-              .body(validRequest)
+              .contentType(MediaType.MULTIPART_FORM_DATA)
+              .body(builder.build())
               .exchange()
               .expectStatus().isNotFound();
     }
 
     @Test
-    void addImageToNotOwnedArtwork() {
+    void addImageToNotOwnedArtwork() throws IOException {
+        builder.part("file", new ByteArrayResource(file.getBytes()) {
+                   @Override
+                   public String getFilename() {
+                       return file.getOriginalFilename();
+                   }
+               })
+               .contentType(MediaType.IMAGE_JPEG);
+
         when(service.addImage(eq(1L), eq(1L), any())).thenThrow(new ForbiddenException(ErrorMessages.NOT_ARTWORK_OWNER));
 
         client.post()
               .uri("/user/1/artwork/1/images")
-              .contentType(MediaType.APPLICATION_JSON)
-              .body(validRequest)
+              .contentType(MediaType.MULTIPART_FORM_DATA)
+              .body(builder.build())
               .exchange()
               .expectStatus().isForbidden();
     }
 
     @Test
-    void addImageExceedingMaxImagesPerArtwork() {
+    void addImageExceedingMaxImagesPerArtwork() throws IOException {
+        builder.part("file", new ByteArrayResource(file.getBytes()) {
+                   @Override
+                   public String getFilename() {
+                       return file.getOriginalFilename();
+                   }
+               })
+               .contentType(MediaType.IMAGE_JPEG);
+
         when(service.addImage(eq(1L), eq(1L), any())).thenThrow(new BadRequestException(ErrorMessages.TOO_MANY_IMAGES));
 
         client.post()
               .uri("/user/1/artwork/1/images")
-              .contentType(MediaType.APPLICATION_JSON)
-              .body(validRequest)
+              .contentType(MediaType.MULTIPART_FORM_DATA)
+              .body(builder.build())
               .exchange()
               .expectStatus().isBadRequest();
     }
