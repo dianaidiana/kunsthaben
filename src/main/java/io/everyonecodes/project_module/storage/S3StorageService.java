@@ -1,10 +1,12 @@
 package io.everyonecodes.project_module.storage;
 
+import io.everyonecodes.project_module.exceptions.BadRequestException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 import java.io.IOException;
@@ -50,5 +52,24 @@ public class S3StorageService {
             return "";
         }
         return originalFilename.substring(originalFilename.lastIndexOf('.'));
+    }
+
+    public void deleteFile(String url) {
+        var key = keyOf(url);
+
+        s3Client.deleteObject(
+                DeleteObjectRequest.builder()
+                                   .bucket(bucketName)
+                                   .key(key)
+                                   .build()
+        );
+    }
+
+    // https://kunsthaben-artwork-images-996241421825-eu-north-1-an.s3.eu-north-1.amazonaws.com/29721856-00a4-4d43-9eae-a09ce3ba8d89.jpg
+    private String keyOf(String url) {
+        if (url == null || !url.contains("/")) {
+            throw new IllegalArgumentException("Cannot extract S3 key from malformed URL: " + url);
+        }
+        return url.substring(url.lastIndexOf('/') + 1);
     }
 }
