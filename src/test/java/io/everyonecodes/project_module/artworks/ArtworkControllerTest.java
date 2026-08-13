@@ -210,7 +210,7 @@ class ArtworkControllerTest {
         client.delete()
               .uri("/user/1/artwork/1")
               .exchange()
-              .expectStatus().isOk();
+              .expectStatus().isNoContent();
 
         verify(service).delete(1L, 1L);
     }

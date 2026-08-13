@@ -129,7 +129,7 @@ public class UserControllerTest {
         client.delete()
               .uri("/user/1")
               .exchange()
-              .expectStatus().isOk();
+              .expectStatus().isNoContent();
 
         verify(service).delete(1L);
     }

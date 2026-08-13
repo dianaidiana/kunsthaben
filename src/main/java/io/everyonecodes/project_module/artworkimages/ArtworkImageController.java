@@ -21,11 +21,13 @@ public class ArtworkImageController {
         return service.addImage(artistId, artworkId, file);
     }
 
+    @ResponseStatus(HttpStatus.NO_CONTENT)
     @PutMapping("/user/{artistId}/artwork/{artworkId}/images/reorder")
     void reorderImages(@PathVariable Long artistId, @PathVariable Long artworkId, @RequestBody List<Long> imageIdsInNewOrder) {
         service.reorderImages(artistId, artworkId, imageIdsInNewOrder);
     }
 
+    @ResponseStatus(HttpStatus.NO_CONTENT)
     @DeleteMapping("/user/{artistId}/artwork/{artworkId}/images/{imageId}")
     void deleteImage(@PathVariable Long artistId, @PathVariable Long artworkId, @PathVariable Long imageId) {
         service.deleteImage(artistId, artworkId, imageId);

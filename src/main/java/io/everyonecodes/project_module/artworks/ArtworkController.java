@@ -67,6 +67,7 @@ public class ArtworkController {
         return service.update(artistId, artworkId, request);
     }
 
+    @ResponseStatus(HttpStatus.NO_CONTENT)
     @DeleteMapping("/user/{artistId}/artwork/{artworkId}")
     void delete(@PathVariable Long artistId, @PathVariable Long artworkId) {
         service.delete(artistId, artworkId);

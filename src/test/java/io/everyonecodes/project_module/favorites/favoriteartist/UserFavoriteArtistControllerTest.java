@@ -99,7 +99,7 @@ class UserFavoriteArtistControllerTest {
         client.delete()
               .uri("/user/1/favorite-artist/1")
               .exchange()
-              .expectStatus().isOk();
+              .expectStatus().isNoContent();
 
         verify(service).deleteFavoriteArtist(1L, 1L);
     }

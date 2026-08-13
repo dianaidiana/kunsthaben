@@ -165,7 +165,7 @@ class ArtworkImageControllerTest {
               .contentType(MediaType.APPLICATION_JSON)
               .body(List.of(2L, 1L))
               .exchange()
-              .expectStatus().isOk();
+              .expectStatus().isNoContent();
 
         verify(service).reorderImages(1L, 1L, List.of(2L, 1L));
     }
@@ -211,7 +211,7 @@ class ArtworkImageControllerTest {
         client.delete()
               .uri("/user/1/artwork/1/images/1")
               .exchange()
-              .expectStatus().isOk();
+              .expectStatus().isNoContent();
 
         verify(service).deleteImage(1L, 1L, 1L);
     }
