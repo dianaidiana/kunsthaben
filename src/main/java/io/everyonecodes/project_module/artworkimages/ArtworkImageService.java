@@ -82,6 +82,8 @@ public class ArtworkImageService {
             var image = repository.getReferenceById(imageIdsInNewOrder.get(i));
             image.setSortOrder(i + MAX_IMAGES_PER_ARTWORK * 2);
         }
+        // force the temp-value updates to be saved in the DB now
+        repository.flush();
 
         // then I save the new order
         for (int i = 0; i < imageIdsInNewOrder.size(); i++) {
