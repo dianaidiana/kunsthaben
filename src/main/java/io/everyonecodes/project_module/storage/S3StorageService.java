@@ -64,7 +64,6 @@ public class S3StorageService {
         );
     }
 
-    // https://kunsthaben-artwork-images-996241421825-eu-north-1-an.s3.eu-north-1.amazonaws.com/29721856-00a4-4d43-9eae-a09ce3ba8d89.jpg
     private String keyOf(String url) {
         if (url == null || !url.contains("/")) {
             throw new IllegalArgumentException("Cannot extract S3 key from malformed URL: " + url);
