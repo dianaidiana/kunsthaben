@@ -146,6 +146,21 @@ class ArtworkImageServiceTest {
     }
 
     @Test
+    void addImageWithInvalidContentType() {
+        when(artworkService.fetchOwnedArtwork(user.getId(), artwork.getId())).thenReturn(artwork);
+        when(repository.countByArtworkId(artwork.getId())).thenReturn(0);
+
+        MockMultipartFile invalidFile = new MockMultipartFile(
+                "file", "painting.pdf", "application/pdf", "fake bytes".getBytes()
+        );
+
+        assertThrows(BadRequestException.class,
+                () -> service.addImage(user.getId(), artwork.getId(), invalidFile));
+
+        verifyNoInteractions(s3StorageService);
+    }
+
+    @Test
     void reorderImagesNotOwnedArtwork() {
         Long artistId = 1L;
         Long artworkId = 1L;
