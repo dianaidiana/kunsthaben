@@ -104,6 +104,7 @@ public class ArtworkImageService {
                                      .filter(id -> !id.equals(imageId))
                                      .toList();
         repository.delete(image);
+        s3StorageService.deleteFile(image.getUrl());
         reorderImages(artistId, artworkId, remainingIds);
     }
 }
