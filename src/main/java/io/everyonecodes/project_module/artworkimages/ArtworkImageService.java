@@ -9,6 +9,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import javax.imageio.ImageIO;
+import java.io.IOException;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -42,6 +44,14 @@ public class ArtworkImageService {
         }
 
         if (file.isEmpty() || !ALLOWED_CONTENT_TYPES.contains(file.getContentType())) {
+            throw new BadRequestException(ErrorMessages.INVALID_IMAGE_FILE);
+        }
+
+        try {
+            if (ImageIO.read(file.getInputStream()) == null) {
+                throw new BadRequestException(ErrorMessages.INVALID_IMAGE_FILE);
+            }
+        } catch (IOException e) {
             throw new BadRequestException(ErrorMessages.INVALID_IMAGE_FILE);
         }
 

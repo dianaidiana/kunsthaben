@@ -24,6 +24,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -87,8 +92,21 @@ class ArtworkImageServiceTest {
             "file",                       // the request-param name (matches @RequestParam("file"))
             "painting.jpg",                     // original filename
             "image/jpeg",                       // content type
-            "fake image bytes".getBytes()       // actual file content, as bytes
+            validJpegBytes()                    // actual file content: a real, decodable 1x1 JPEG
     );
+
+    // ImageIO.read(...) in ArtworkImageService only accepts genuinely decodable image bytes,
+    // so tests need real (if tiny) image content, not an arbitrary byte array.
+    private static byte[] validJpegBytes() {
+        try {
+            var image = new BufferedImage(1, 1, BufferedImage.TYPE_INT_RGB);
+            var out = new ByteArrayOutputStream();
+            ImageIO.write(image, "jpg", out);
+            return out.toByteArray();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
 
     private final ArtworkImage artworkImage1 = new ArtworkImage(1L, artwork, "urlurl1.com", 0);
     private final ArtworkImage artworkImage2 = new ArtworkImage(2L, artwork, "urlurl2.com", 1);
