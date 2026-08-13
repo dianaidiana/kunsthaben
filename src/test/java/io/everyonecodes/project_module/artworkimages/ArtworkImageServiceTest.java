@@ -108,9 +108,9 @@ class ArtworkImageServiceTest {
         }
     }
 
-    private final ArtworkImage artworkImage1 = new ArtworkImage(1L, artwork, "urlurl1.com", 0);
-    private final ArtworkImage artworkImage2 = new ArtworkImage(2L, artwork, "urlurl2.com", 1);
-    private final ArtworkImage artworkImage3 = new ArtworkImage(3L, artwork, "urlurl3.com", 2);
+    private final ArtworkImage artworkImage1 = new ArtworkImage(1L, artwork, "https://bucket.s3.region.amazonaws.com/key1.jpg", 0);
+    private final ArtworkImage artworkImage2 = new ArtworkImage(2L, artwork, "https://bucket.s3.region.amazonaws.com/key2.jpg", 1);
+    private final ArtworkImage artworkImage3 = new ArtworkImage(3L, artwork, "https://bucket.s3.region.amazonaws.com/key3.jpg", 2);
 
     @Test
     void addImageToUnexistentArtwork() {
@@ -285,8 +285,31 @@ class ArtworkImageServiceTest {
         service.deleteImage(artistId, artworkId, artworkImage2.getId());
 
         verify(repository).delete(artworkImage2);
+        verify(s3StorageService).deleteFile(artworkImage2.getUrl());
         assertEquals(0, artworkImage1.getSortOrder());
         assertEquals(1, artworkImage3.getSortOrder());
     }
 
+    @Test
+    void deleteImageButS3Throws() {
+        Long artistId = user.getId();
+        Long artworkId = artwork.getId();
+
+        artwork.getImages().add(artworkImage1);
+        artwork.getImages().add(artworkImage2);
+        artwork.getImages().add(artworkImage3);
+
+        when(artworkService.fetchOwnedArtwork(artistId, artworkId)).thenReturn(artwork);
+        when(repository.findById(artworkImage2.getId())).thenReturn(Optional.of(artworkImage2));
+        when(repository.findArtworkImageByArtworkId(artworkId)).thenReturn(List.of(artworkImage1, artworkImage3));
+        doThrow(new RuntimeException("S3 failed")).when(s3StorageService).deleteFile(artworkImage2.getUrl());
+
+
+        assertThrows(RuntimeException.class,
+                () -> service.deleteImage(artistId, artworkId, artworkImage2.getId()));
+
+        verify(repository).delete(artworkImage2);
+        verify(s3StorageService).deleteFile(artworkImage2.getUrl());
+        verify(repository, never()).getReferenceById(any());
+    }
 }
