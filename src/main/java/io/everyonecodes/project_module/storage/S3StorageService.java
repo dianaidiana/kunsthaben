@@ -1,6 +1,5 @@
 package io.everyonecodes.project_module.storage;
 
-import io.everyonecodes.project_module.exceptions.BadRequestException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;

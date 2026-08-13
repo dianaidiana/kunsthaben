@@ -25,9 +25,6 @@ import static org.mockito.Mockito.when;
 @AutoConfigureRestTestClient
 class UserFavoriteArtistControllerTest {
 
-    @Autowired
-    UserFavoriteArtistController controller;
-
     @MockitoBean
     UserFavoriteArtistService service;
 
