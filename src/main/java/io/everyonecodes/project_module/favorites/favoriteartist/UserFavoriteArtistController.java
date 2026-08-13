@@ -1,6 +1,7 @@
 package io.everyonecodes.project_module.favorites.favoriteartist;
 
 import io.everyonecodes.project_module.users.dto.UserResponse;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -14,6 +15,7 @@ public class UserFavoriteArtistController {
         this.service = service;
     }
 
+    @ResponseStatus(HttpStatus.CREATED)
     @PostMapping("/user/{userId}/favorite-artist/{artistId}")
     UserResponse saveFavoriteArtist(@PathVariable Long userId, @PathVariable Long artistId) {
         return service.saveFavoriteArtist(userId, artistId);

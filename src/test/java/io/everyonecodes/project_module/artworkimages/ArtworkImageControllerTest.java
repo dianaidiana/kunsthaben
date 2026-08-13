@@ -57,14 +57,14 @@ class ArtworkImageControllerTest {
                })
                .contentType(MediaType.IMAGE_JPEG);
 
-        when(service.addImage(eq(1L), eq(1L), file)).thenReturn(expectedImage);
+        when(service.addImage(eq(1L), eq(1L), any())).thenReturn(expectedImage);
 
         ArtworkImage response = client.post()
                                       .uri("/user/1/artwork/1/images")
                                       .contentType(MediaType.MULTIPART_FORM_DATA)
                                       .body(builder.build())
                                       .exchange()
-                                      .expectStatus().isOk()
+                                      .expectStatus().isCreated()
                                       .expectBody(ArtworkImage.class)
                                       .returnResult()
                                       .getResponseBody();

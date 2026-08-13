@@ -6,6 +6,7 @@ import io.everyonecodes.project_module.users.dto.UserRegisterRequest;
 import io.everyonecodes.project_module.users.dto.UserResponse;
 import io.everyonecodes.project_module.users.dto.UserUpdateRequest;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -17,6 +18,7 @@ public class UserController {
         this.userService = userService;
     }
 
+    @ResponseStatus(HttpStatus.CREATED)
     @PostMapping("/user/register")
     UserResponse register(@Valid @RequestBody UserRegisterRequest userRequest) {
         return userService.register(userRequest);

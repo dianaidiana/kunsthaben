@@ -48,7 +48,7 @@ public class UserControllerTest {
                                       .contentType(MediaType.APPLICATION_JSON)
                                       .body(request)
                                       .exchange()
-                                      .expectStatus().isOk()
+                                      .expectStatus().isCreated()
                                       .expectBody(UserResponse.class)
                                       .returnResult()
                                       .getResponseBody();

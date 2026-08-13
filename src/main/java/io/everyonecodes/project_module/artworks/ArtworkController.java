@@ -12,6 +12,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -55,6 +56,7 @@ public class ArtworkController {
         return service.getSoldCardsByArtistId(artistId, pageable);
     }
 
+    @ResponseStatus(HttpStatus.CREATED)
     @PostMapping("/user/{artistId}/artwork")
     ArtworkDetailResponse create(@PathVariable Long artistId, @Valid @RequestBody ArtworkCreateRequest request) {
         return service.create(artistId, request);

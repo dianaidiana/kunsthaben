@@ -46,7 +46,7 @@ class UserFavoriteArtistControllerTest {
         UserResponse response = client.post()
                                       .uri("/user/1/favorite-artist/1")
                                       .exchange()
-                                      .expectStatus().isOk()
+                                      .expectStatus().isCreated()
                                       .expectBody(UserResponse.class)
                                       .returnResult()
                                       .getResponseBody();

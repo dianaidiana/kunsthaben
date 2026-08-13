@@ -156,7 +156,7 @@ class ArtworkControllerTest {
                                                .contentType(MediaType.APPLICATION_JSON)
                                                .body(createRequest)
                                                .exchange()
-                                               .expectStatus().isOk()
+                                               .expectStatus().isCreated()
                                                .expectBody(ArtworkDetailResponse.class)
                                                .returnResult()
                                                .getResponseBody();
