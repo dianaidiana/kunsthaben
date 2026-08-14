@@ -8,6 +8,7 @@ import io.everyonecodes.project_module.users.dto.UserUpdateRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 public class UserController {
@@ -33,6 +34,28 @@ public class UserController {
     @PutMapping("/user/{id}")
     UserResponse update(@PathVariable Long id, @Valid @RequestBody UserUpdateRequest updateRequest) {
         return userService.update(id, updateRequest);
+    }
+
+    @PutMapping(path = "/user/{id}/avatar", consumes = "multipart/form-data")
+    UserResponse updateAvatar(@PathVariable Long id, @RequestParam("file") MultipartFile file) {
+        return userService.updateAvatar(id, file);
+    }
+
+    @PutMapping(path = "/user/{id}/banner", consumes = "multipart/form-data")
+    UserResponse updateBanner(@PathVariable Long id, @RequestParam("file") MultipartFile file) {
+        return userService.updateBanner(id, file);
+    }
+
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @DeleteMapping("/user/{id}/avatar")
+    void deleteAvatar(@PathVariable Long id) {
+        userService.deleteAvatar(id);
+    }
+
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @DeleteMapping("/user/{id}/banner")
+    void deleteBanner(@PathVariable Long id) {
+        userService.deleteBanner(id);
     }
 
     @ResponseStatus(HttpStatus.NO_CONTENT)
