@@ -9,4 +9,6 @@ public interface ArtworkImageRepository extends JpaRepository<ArtworkImage, Long
     List<ArtworkImage> findArtworkImageByArtworkId(Long artworkId);
 
     int countByArtworkId(Long artworkId);
+
+    List<ArtworkImage> findArtworkImageByArtworkArtistId(Long artistId);
 }
