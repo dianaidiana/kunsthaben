@@ -10,7 +10,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureRestTestClient;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.client.RestTestClient;
 
@@ -37,6 +39,17 @@ public class UserControllerTest {
 
     private final UserResponse expectedUser = new UserResponse(1L, "Bob Ross", "bob@ross.com",
             null, null, "Vienna", "1020", null, createdAt);
+
+    private final MultipartBodyBuilder builder = new MultipartBodyBuilder();
+
+    private void addFilePart(String filename) {
+        builder.part("file", new ByteArrayResource("fake image bytes".getBytes()) {
+            @Override
+            public String getFilename() {
+                return filename;
+            }
+        }).contentType(MediaType.IMAGE_JPEG);
+    }
 
     @Test
     void registerSuccessfully() {
@@ -94,7 +107,7 @@ public class UserControllerTest {
 
     @Test
     void updateSuccessfully() {
-        var request = new UserUpdateRequest("Bob Ross", null, null, "Vienna", "1020", "Updated bio");
+        var request = new UserUpdateRequest("Bob Ross", "Vienna", "1020", "Updated bio");
         var expectedUserWithBio = new UserResponse(1L, "Bob Ross", "bob@ross.com",
                 null, null, "Vienna", "1020", "Updated bio", createdAt);
         when(service.update(eq(1L), any())).thenReturn(expectedUserWithBio);
@@ -113,13 +126,119 @@ public class UserControllerTest {
 
     @Test
     void updateUnexistentUser() {
-        var request = new UserUpdateRequest("Bob Ross", null, null, "Vienna", "1020", "Updated bio");
+        var request = new UserUpdateRequest("Bob Ross", "Vienna", "1020", "Updated bio");
         when(service.update(eq(1L), any())).thenThrow(new NotFoundException(ErrorMessages.USER_NOT_FOUND));
 
         client.put()
               .uri("/user/1")
               .contentType(MediaType.APPLICATION_JSON)
               .body(request)
+              .exchange()
+              .expectStatus().isNotFound();
+    }
+
+    @Test
+    void updateAvatarSuccessfully() {
+        addFilePart("avatar.jpg");
+        var expectedUserWithAvatar = new UserResponse(1L, "Bob Ross", "bob@ross.com",
+                null, "https://bucket.s3.region.amazonaws.com/avatar.jpg", "Vienna", "1020", null, createdAt);
+        when(service.updateAvatar(eq(1L), any())).thenReturn(expectedUserWithAvatar);
+
+        UserResponse response = client.put()
+                                      .uri("/user/1/avatar")
+                                      .contentType(MediaType.MULTIPART_FORM_DATA)
+                                      .body(builder.build())
+                                      .exchange()
+                                      .expectStatus().isOk()
+                                      .expectBody(UserResponse.class)
+                                      .returnResult()
+                                      .getResponseBody();
+        assertEquals(expectedUserWithAvatar, response);
+    }
+
+    @Test
+    void updateAvatarUnexistentUser() {
+        addFilePart("avatar.jpg");
+        when(service.updateAvatar(eq(1L), any())).thenThrow(new NotFoundException(ErrorMessages.USER_NOT_FOUND));
+
+        client.put()
+              .uri("/user/1/avatar")
+              .contentType(MediaType.MULTIPART_FORM_DATA)
+              .body(builder.build())
+              .exchange()
+              .expectStatus().isNotFound();
+    }
+
+    @Test
+    void updateBannerSuccessfully() {
+        addFilePart("banner.jpg");
+        var expectedUserWithBanner = new UserResponse(1L, "Bob Ross", "bob@ross.com",
+                "https://bucket.s3.region.amazonaws.com/banner.jpg", null, "Vienna", "1020", null, createdAt);
+        when(service.updateBanner(eq(1L), any())).thenReturn(expectedUserWithBanner);
+
+        UserResponse response = client.put()
+                                      .uri("/user/1/banner")
+                                      .contentType(MediaType.MULTIPART_FORM_DATA)
+                                      .body(builder.build())
+                                      .exchange()
+                                      .expectStatus().isOk()
+                                      .expectBody(UserResponse.class)
+                                      .returnResult()
+                                      .getResponseBody();
+        assertEquals(expectedUserWithBanner, response);
+    }
+
+    @Test
+    void updateBannerUnexistentUser() {
+        addFilePart("banner.jpg");
+        when(service.updateBanner(eq(1L), any())).thenThrow(new NotFoundException(ErrorMessages.USER_NOT_FOUND));
+
+        client.put()
+              .uri("/user/1/banner")
+              .contentType(MediaType.MULTIPART_FORM_DATA)
+              .body(builder.build())
+              .exchange()
+              .expectStatus().isNotFound();
+    }
+
+    @Test
+    void deleteAvatarSuccessfully() {
+        client.delete()
+              .uri("/user/1/avatar")
+              .exchange()
+              .expectStatus().isNoContent();
+
+        verify(service).deleteAvatar(1L);
+    }
+
+    @Test
+    void deleteAvatarUnexistentUser() {
+        org.mockito.Mockito.doThrow(new NotFoundException(ErrorMessages.USER_NOT_FOUND))
+                           .when(service).deleteAvatar(1L);
+
+        client.delete()
+              .uri("/user/1/avatar")
+              .exchange()
+              .expectStatus().isNotFound();
+    }
+
+    @Test
+    void deleteBannerSuccessfully() {
+        client.delete()
+              .uri("/user/1/banner")
+              .exchange()
+              .expectStatus().isNoContent();
+
+        verify(service).deleteBanner(1L);
+    }
+
+    @Test
+    void deleteBannerUnexistentUser() {
+        org.mockito.Mockito.doThrow(new NotFoundException(ErrorMessages.USER_NOT_FOUND))
+                           .when(service).deleteBanner(1L);
+
+        client.delete()
+              .uri("/user/1/banner")
               .exchange()
               .expectStatus().isNotFound();
     }
