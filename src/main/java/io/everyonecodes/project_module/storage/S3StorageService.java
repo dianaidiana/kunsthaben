@@ -5,11 +5,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
-import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.model.*;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -18,6 +18,8 @@ public class S3StorageService {
     private final S3Client s3Client;
     private final String bucketName;
     private final String region;
+
+    private static final int MAX_KEYS_PER_BATCH = 1000;
 
     public S3StorageService(S3Client s3client,
                             @Value("${aws.s3.bucket-name}") String bucketName,
@@ -62,6 +64,28 @@ public class S3StorageService {
                                    .key(key)
                                    .build()
         );
+    }
+
+    public void deleteFiles(List<String> urls) {
+        if (urls.isEmpty()) {
+            return;
+        }
+
+        var objectIds = urls.stream()
+                            .map(this::keyOf)
+                            .map(key -> ObjectIdentifier.builder().key(key).build())
+                            .toList();
+
+        // S3 has a limit of 1000 keys per batch, so I split it in chunks of that size
+        for (int i = 0; i < objectIds.size(); i += MAX_KEYS_PER_BATCH) {
+            var chunk = objectIds.subList(i, Math.min(i + MAX_KEYS_PER_BATCH, objectIds.size()));
+            s3Client.deleteObjects(
+                    DeleteObjectsRequest.builder()
+                                        .bucket(bucketName)
+                                        .delete(Delete.builder().objects(chunk).build())
+                                        .build()
+            );
+        }
     }
 
     private String keyOf(String url) {
