@@ -6,7 +6,6 @@ import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
-import org.hibernate.validator.constraints.URL;
 
 @AllArgsConstructor
 @Getter
@@ -20,12 +19,6 @@ public class UserUpdateRequest {
 
     @NotBlank(message = ErrorMessages.NAME_REQUIRED)
     private String name;
-
-    @URL(message = ErrorMessages.BANNER_URL_INVALID)
-    private String bannerUrl;
-
-    @URL(message = ErrorMessages.AVATAR_URL_INVALID)
-    private String avatarUrl;
 
     @NotBlank(message = ErrorMessages.CITY_REQUIRED)
     private String city;
