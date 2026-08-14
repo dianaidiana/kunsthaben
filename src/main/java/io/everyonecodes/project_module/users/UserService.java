@@ -1,5 +1,6 @@
 package io.everyonecodes.project_module.users;
 
+import io.everyonecodes.project_module.artworkimages.ArtworkImageService;
 import io.everyonecodes.project_module.exceptions.BadRequestException;
 import io.everyonecodes.project_module.exceptions.ConflictException;
 import io.everyonecodes.project_module.exceptions.ErrorMessages;
@@ -23,13 +24,15 @@ public class UserService {
 
     private final UserRepository repository;
     private final S3StorageService s3StorageService;
+    private final ArtworkImageService artworkImageService;
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
 
     private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of("image/jpeg", "image/png", "image/webp");
 
-    public UserService(UserRepository repository, S3StorageService s3StorageService) {
+    public UserService(UserRepository repository, S3StorageService s3StorageService, ArtworkImageService artworkImageService) {
         this.repository = repository;
         this.s3StorageService = s3StorageService;
+        this.artworkImageService = artworkImageService;
     }
 
     public UserResponse register(UserRegisterRequest userRequest) {
@@ -109,6 +112,7 @@ public class UserService {
     @Transactional
     public void delete(Long id) {
         var user = fetchUser(id);
+        artworkImageService.deleteAllImagesForArtist(id);
         if (user.getAvatarUrl() != null) {
             s3StorageService.deleteFile(user.getAvatarUrl());
         }
@@ -128,7 +132,6 @@ public class UserService {
         if (file.isEmpty() || !ALLOWED_CONTENT_TYPES.contains(file.getContentType())) {
             throw new BadRequestException(ErrorMessages.INVALID_IMAGE_FILE);
         }
-
         try {
             if (ImageIO.read(file.getInputStream()) == null) {
                 throw new BadRequestException(ErrorMessages.INVALID_IMAGE_FILE);
