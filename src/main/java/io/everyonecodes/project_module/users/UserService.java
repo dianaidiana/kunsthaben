@@ -89,23 +89,21 @@ public class UserService {
     }
 
     @Transactional
-    public UserResponse deleteAvatar(Long id) {
+    public void deleteAvatar(Long id) {
         var user = fetchUser(id);
         if (user.getAvatarUrl() != null) {
             s3StorageService.deleteFile(user.getAvatarUrl());
         }
         user.setAvatarUrl(null);
-        return UserResponse.from(user);
     }
 
     @Transactional
-    public UserResponse deleteBanner(Long id) {
+    public void deleteBanner(Long id) {
         var user = fetchUser(id);
         if (user.getBannerUrl() != null) {
             s3StorageService.deleteFile(user.getBannerUrl());
         }
         user.setBannerUrl(null);
-        return UserResponse.from(user);
     }
 
     @Transactional
