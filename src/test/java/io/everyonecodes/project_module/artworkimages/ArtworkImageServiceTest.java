@@ -312,4 +312,24 @@ class ArtworkImageServiceTest {
         verify(s3StorageService).deleteFile(artworkImage2.getUrl());
         verify(repository, never()).getReferenceById(any());
     }
+
+    @Test
+    void deleteAllImagesForArtistWithImages() {
+        when(repository.findArtworkImageByArtworkArtistId(user.getId()))
+                .thenReturn(List.of(artworkImage1, artworkImage2));
+
+        service.deleteAllImagesForArtist(user.getId());
+
+        verify(s3StorageService).deleteFiles(List.of(artworkImage1.getUrl(), artworkImage2.getUrl()));
+    }
+
+    @Test
+    void deleteAllImagesForArtistWithNoImages() {
+        when(repository.findArtworkImageByArtworkArtistId(user.getId()))
+                .thenReturn(List.of());
+
+        service.deleteAllImagesForArtist(user.getId());
+
+        verify(s3StorageService).deleteFiles(List.of());
+    }
 }
