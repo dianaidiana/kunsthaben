@@ -1,5 +1,6 @@
 package io.everyonecodes.project_module.users;
 
+import io.everyonecodes.project_module.artworkimages.ArtworkImageService;
 import io.everyonecodes.project_module.exceptions.BadRequestException;
 import io.everyonecodes.project_module.exceptions.ConflictException;
 import io.everyonecodes.project_module.exceptions.NotFoundException;
@@ -39,9 +40,12 @@ class UserServiceTest {
     @Mock
     S3StorageService s3StorageService;
 
+    @Mock
+    ArtworkImageService artworkImageService;
+
     @BeforeEach
     void setup() {
-        service = new UserService(repository, s3StorageService);
+        service = new UserService(repository, s3StorageService, artworkImageService);
     }
 
     private static MockMultipartFile validImageFile() {
@@ -279,6 +283,7 @@ class UserServiceTest {
 
         service.delete(1L);
 
+        verify(artworkImageService).deleteAllImagesForArtist(1L);
         verify(repository).delete(user);
     }
 
