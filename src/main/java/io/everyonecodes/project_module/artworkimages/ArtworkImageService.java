@@ -107,4 +107,12 @@ public class ArtworkImageService {
         s3StorageService.deleteFile(image.getUrl());
         reorderImages(artistId, artworkId, remainingIds);
     }
+
+    @Transactional
+    public void deleteAllImagesForArtist(Long artistId) {
+        var urls = repository.findArtworkImageByArtworkArtistId(artistId).stream()
+                             .map(ArtworkImage::getUrl)
+                             .toList();
+        s3StorageService.deleteFiles(urls);
+    }
 }
