@@ -2,7 +2,7 @@ package io.everyonecodes.project_module.artworkimages;
 
 
 import io.everyonecodes.project_module.artworks.Artwork;
-import io.everyonecodes.project_module.artworks.ArtworkService;
+import io.everyonecodes.project_module.artworks.ArtworkOwnershipService;
 import io.everyonecodes.project_module.artworks.dimensions.Dimensions;
 import io.everyonecodes.project_module.artworks.dimensions.Frame;
 import io.everyonecodes.project_module.classification.category.Category;
@@ -47,14 +47,14 @@ class ArtworkImageServiceTest {
     ArtworkImageRepository repository;
 
     @Mock
-    ArtworkService artworkService;
+    ArtworkOwnershipService artworkOwnershipService;
 
     @Mock
     S3StorageService s3StorageService;
 
     @BeforeEach
     void setup() {
-        service = new ArtworkImageService(repository, artworkService, s3StorageService);
+        service = new ArtworkImageService(repository, artworkOwnershipService, s3StorageService);
     }
 
     private final OffsetDateTime createdAt = OffsetDateTime.parse("2024-01-01T09:15:30Z");
@@ -116,7 +116,7 @@ class ArtworkImageServiceTest {
     void addImageToUnexistentArtwork() {
         Long artistId = 1L;
         Long artworkId = 1L;
-        when(artworkService.fetchOwnedArtwork(artistId, artworkId)).thenThrow(new NotFoundException(ErrorMessages.ARTWORK_NOT_FOUND));
+        when(artworkOwnershipService.fetchOwnedArtwork(artistId, artworkId)).thenThrow(new NotFoundException(ErrorMessages.ARTWORK_NOT_FOUND));
         assertThrows(NotFoundException.class, () -> service.addImage(artistId, artworkId, file));
     }
 
@@ -124,7 +124,7 @@ class ArtworkImageServiceTest {
     void addImageToNotOwnedArtwork() {
         Long artistId = 1L;
         Long artworkId = 1L;
-        when(artworkService.fetchOwnedArtwork(artistId, artworkId)).thenThrow(new ForbiddenException(ErrorMessages.NOT_ARTWORK_OWNER));
+        when(artworkOwnershipService.fetchOwnedArtwork(artistId, artworkId)).thenThrow(new ForbiddenException(ErrorMessages.NOT_ARTWORK_OWNER));
         assertThrows(ForbiddenException.class, () -> service.addImage(artistId, artworkId, file));
     }
 
@@ -138,7 +138,7 @@ class ArtworkImageServiceTest {
 
     @Test
     void addImageAtMaxBoundarySucceeds() {
-        when(artworkService.fetchOwnedArtwork(user.getId(), artwork.getId())).thenReturn(artwork);
+        when(artworkOwnershipService.fetchOwnedArtwork(user.getId(), artwork.getId())).thenReturn(artwork);
         when(repository.countByArtworkId(artwork.getId())).thenReturn(ArtworkImageService.MAX_IMAGES_PER_ARTWORK - 1);
         when(s3StorageService.uploadFile(file)).thenReturn("https://bucket.s3.region.amazonaws.com/key.jpg");
         when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -150,7 +150,7 @@ class ArtworkImageServiceTest {
     @Test
     void addImageSuccessfully() {
         artwork.getImages().add(artworkImage1);
-        when(artworkService.fetchOwnedArtwork(user.getId(), artworkImage1.getId())).thenReturn(artwork);
+        when(artworkOwnershipService.fetchOwnedArtwork(user.getId(), artworkImage1.getId())).thenReturn(artwork);
         when(repository.countByArtworkId(artwork.getId())).thenReturn(1);
         when(s3StorageService.uploadFile(file)).thenReturn("https://bucket.s3.region.amazonaws.com/key.jpg");
         when(repository.save(any())).thenAnswer(invocation -> {
@@ -165,7 +165,7 @@ class ArtworkImageServiceTest {
 
     @Test
     void addImageWithInvalidContentType() {
-        when(artworkService.fetchOwnedArtwork(user.getId(), artwork.getId())).thenReturn(artwork);
+        when(artworkOwnershipService.fetchOwnedArtwork(user.getId(), artwork.getId())).thenReturn(artwork);
         when(repository.countByArtworkId(artwork.getId())).thenReturn(0);
 
         MockMultipartFile invalidFile = new MockMultipartFile(
@@ -182,7 +182,7 @@ class ArtworkImageServiceTest {
     void reorderImagesNotOwnedArtwork() {
         Long artistId = 1L;
         Long artworkId = 1L;
-        when(artworkService.fetchOwnedArtwork(artistId, artworkId)).thenThrow(new ForbiddenException(ErrorMessages.NOT_ARTWORK_OWNER));
+        when(artworkOwnershipService.fetchOwnedArtwork(artistId, artworkId)).thenThrow(new ForbiddenException(ErrorMessages.NOT_ARTWORK_OWNER));
         assertThrows(ForbiddenException.class, () -> service.reorderImages(artistId, artworkId, List.of(1L)));
     }
 
@@ -190,13 +190,13 @@ class ArtworkImageServiceTest {
     void reorderImagesUnexistentArtwork() {
         Long artistId = 1L;
         Long artworkId = 1L;
-        when(artworkService.fetchOwnedArtwork(artistId, artworkId)).thenThrow(new NotFoundException(ErrorMessages.ARTWORK_NOT_FOUND));
+        when(artworkOwnershipService.fetchOwnedArtwork(artistId, artworkId)).thenThrow(new NotFoundException(ErrorMessages.ARTWORK_NOT_FOUND));
         assertThrows(NotFoundException.class, () -> service.reorderImages(artistId, artworkId, List.of(1L)));
     }
 
     @Test
     void reorderImagesDifferentSet() {
-        when(artworkService.fetchOwnedArtwork(user.getId(), artwork.getId())).thenReturn(artwork);
+        when(artworkOwnershipService.fetchOwnedArtwork(user.getId(), artwork.getId())).thenReturn(artwork);
         artwork.getImages().add(artworkImage1);
         artwork.getImages().add(artworkImage2);
 
@@ -206,7 +206,7 @@ class ArtworkImageServiceTest {
 
     @Test
     void reorderImagesLargerSet() {
-        when(artworkService.fetchOwnedArtwork(user.getId(), artwork.getId())).thenReturn(artwork);
+        when(artworkOwnershipService.fetchOwnedArtwork(user.getId(), artwork.getId())).thenReturn(artwork);
         artwork.getImages().add(artworkImage1);
         artwork.getImages().add(artworkImage2);
 
@@ -216,7 +216,7 @@ class ArtworkImageServiceTest {
 
     @Test
     void reorderImagesSuccessfully() {
-        when(artworkService.fetchOwnedArtwork(user.getId(), artwork.getId())).thenReturn(artwork);
+        when(artworkOwnershipService.fetchOwnedArtwork(user.getId(), artwork.getId())).thenReturn(artwork);
         artwork.getImages().add(artworkImage1);
         artwork.getImages().add(artworkImage2);
 
@@ -234,7 +234,7 @@ class ArtworkImageServiceTest {
     void deleteNotOwnedArtwork() {
         Long artistId = 1L;
         Long artworkId = 1L;
-        when(artworkService.fetchOwnedArtwork(artistId, artworkId)).thenThrow(new ForbiddenException(ErrorMessages.NOT_ARTWORK_OWNER));
+        when(artworkOwnershipService.fetchOwnedArtwork(artistId, artworkId)).thenThrow(new ForbiddenException(ErrorMessages.NOT_ARTWORK_OWNER));
         assertThrows(ForbiddenException.class, () -> service.deleteImage(artistId, artworkId, 1L));
     }
 
@@ -242,20 +242,20 @@ class ArtworkImageServiceTest {
     void deleteFromUnexistentArtwork() {
         Long artistId = 1L;
         Long artworkId = 1L;
-        when(artworkService.fetchOwnedArtwork(artistId, artworkId)).thenThrow(new NotFoundException(ErrorMessages.ARTWORK_NOT_FOUND));
+        when(artworkOwnershipService.fetchOwnedArtwork(artistId, artworkId)).thenThrow(new NotFoundException(ErrorMessages.ARTWORK_NOT_FOUND));
         assertThrows(NotFoundException.class, () -> service.deleteImage(artistId, artworkId, 1L));
     }
 
     @Test
     void deleteUnexistentImage() {
-        when(artworkService.fetchOwnedArtwork(any(), any())).thenReturn(artwork);
+        when(artworkOwnershipService.fetchOwnedArtwork(any(), any())).thenReturn(artwork);
         when(repository.findById(any())).thenReturn(Optional.empty());
         assertThrows(NotFoundException.class, () -> service.deleteImage(user.getId(), artwork.getId(), 1L));
     }
 
     @Test
     void deleteImageFromOtherArtwork() {
-        when(artworkService.fetchOwnedArtwork(any(), any())).thenReturn(artwork);
+        when(artworkOwnershipService.fetchOwnedArtwork(any(), any())).thenReturn(artwork);
         when(repository.findById(any())).thenReturn(Optional.of(
                 new ArtworkImage(2L, anotherArtwork, "url.com", 1)
         ));
@@ -271,7 +271,7 @@ class ArtworkImageServiceTest {
         artwork.getImages().add(artworkImage2);
         artwork.getImages().add(artworkImage3);
 
-        when(artworkService.fetchOwnedArtwork(artistId, artworkId)).thenReturn(artwork);
+        when(artworkOwnershipService.fetchOwnedArtwork(artistId, artworkId)).thenReturn(artwork);
         when(repository.findById(artworkImage2.getId())).thenReturn(Optional.of(artworkImage2));
         // findArtworkImageByArtworkId(artworkId) will be called twice: first before deletion,
         // where a filter is applied so that one gets the remainingIds
@@ -299,7 +299,7 @@ class ArtworkImageServiceTest {
         artwork.getImages().add(artworkImage2);
         artwork.getImages().add(artworkImage3);
 
-        when(artworkService.fetchOwnedArtwork(artistId, artworkId)).thenReturn(artwork);
+        when(artworkOwnershipService.fetchOwnedArtwork(artistId, artworkId)).thenReturn(artwork);
         when(repository.findById(artworkImage2.getId())).thenReturn(Optional.of(artworkImage2));
         when(repository.findArtworkImageByArtworkId(artworkId)).thenReturn(List.of(artworkImage1, artworkImage3));
         doThrow(new RuntimeException("S3 failed")).when(s3StorageService).deleteFile(artworkImage2.getUrl());
@@ -314,22 +314,43 @@ class ArtworkImageServiceTest {
     }
 
     @Test
-    void deleteAllImagesForArtistWithImages() {
+    void deleteAllImagesForArtistWithS3Images() {
         when(repository.findArtworkImageByArtworkArtistId(user.getId()))
                 .thenReturn(List.of(artworkImage1, artworkImage2));
 
-        service.deleteAllImagesForArtist(user.getId());
+        service.deleteAllS3ImagesForArtist(user.getId());
 
         verify(s3StorageService).deleteFiles(List.of(artworkImage1.getUrl(), artworkImage2.getUrl()));
     }
 
     @Test
-    void deleteAllImagesForArtistWithNoImages() {
+    void deleteAllImagesForArtistWithNoS3Images() {
         when(repository.findArtworkImageByArtworkArtistId(user.getId()))
                 .thenReturn(List.of());
 
-        service.deleteAllImagesForArtist(user.getId());
+        service.deleteAllS3ImagesForArtist(user.getId());
 
         verify(s3StorageService).deleteFiles(List.of());
+    }
+
+    @Test
+    void deleteAllImagesForArtworkWithImages() {
+        var images = List.of(artworkImage1, artworkImage2);
+        when(repository.findArtworkImageByArtworkId(artwork.getId())).thenReturn(images);
+
+        service.deleteAllImagesForArtwork(artwork.getId());
+
+        verify(s3StorageService).deleteFiles(List.of(artworkImage1.getUrl(), artworkImage2.getUrl()));
+        verify(repository).deleteAll(images);
+    }
+
+    @Test
+    void deleteAllImagesForArtworkWithNoImages() {
+        when(repository.findArtworkImageByArtworkId(artwork.getId())).thenReturn(List.of());
+
+        service.deleteAllImagesForArtwork(artwork.getId());
+
+        verify(s3StorageService).deleteFiles(List.of());
+        verify(repository).deleteAll(List.of());
     }
 }

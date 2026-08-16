@@ -1,6 +1,6 @@
 package io.everyonecodes.project_module.artworkimages;
 
-import io.everyonecodes.project_module.artworks.ArtworkService;
+import io.everyonecodes.project_module.artworks.ArtworkOwnershipService;
 import io.everyonecodes.project_module.exceptions.BadRequestException;
 import io.everyonecodes.project_module.exceptions.ErrorMessages;
 import io.everyonecodes.project_module.exceptions.NotFoundException;
@@ -21,22 +21,22 @@ import java.util.stream.Collectors;
 public class ArtworkImageService {
 
     private final ArtworkImageRepository repository;
-    private final ArtworkService artworkService;
+    private final ArtworkOwnershipService artworkOwnershipService;
     private final S3StorageService s3StorageService;
 
     private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of("image/jpeg", "image/png", "image/webp");
 
     public static final int MAX_IMAGES_PER_ARTWORK = 10;
 
-    public ArtworkImageService(ArtworkImageRepository repository, ArtworkService artworkService, S3StorageService s3StorageService) {
+    public ArtworkImageService(ArtworkImageRepository repository, ArtworkOwnershipService artworkOwnershipService, S3StorageService s3StorageService) {
         this.repository = repository;
-        this.artworkService = artworkService;
+        this.artworkOwnershipService = artworkOwnershipService;
         this.s3StorageService = s3StorageService;
     }
 
     @Transactional
     public ArtworkImage addImage(Long artistId, Long artworkId, MultipartFile file) {
-        var artwork = artworkService.fetchOwnedArtwork(artistId, artworkId);
+        var artwork = artworkOwnershipService.fetchOwnedArtwork(artistId, artworkId);
         var currentCount = repository.countByArtworkId(artworkId);
 
         if (currentCount >= MAX_IMAGES_PER_ARTWORK) {
@@ -62,7 +62,7 @@ public class ArtworkImageService {
 
     @Transactional
     public void reorderImages(Long artistId, Long artworkId, List<Long> imageIdsInNewOrder) {
-        artworkService.fetchOwnedArtwork(artistId, artworkId);
+        artworkOwnershipService.fetchOwnedArtwork(artistId, artworkId);
 
         // get fresh list of current images, to avoid using old cache memory
         var currentImages = repository.findArtworkImageByArtworkId(artworkId);
@@ -94,7 +94,7 @@ public class ArtworkImageService {
 
     @Transactional
     public void deleteImage(Long artistId, Long artworkId, Long imageId) {
-        artworkService.fetchOwnedArtwork(artistId, artworkId);
+        artworkOwnershipService.fetchOwnedArtwork(artistId, artworkId);
         var image = repository.findById(imageId)
                               .filter(img -> img.getArtwork().getId().equals(artworkId))
                               .orElseThrow(() -> new NotFoundException(ErrorMessages.IMAGE_NOT_FOUND));
@@ -114,5 +114,15 @@ public class ArtworkImageService {
                              .map(ArtworkImage::getUrl)
                              .toList();
         s3StorageService.deleteFiles(urls);
+    }
+
+    @Transactional
+    public void deleteAllImagesForArtwork(Long artworkId) {
+        var images = repository.findArtworkImageByArtworkId(artworkId);
+        var urls = images.stream()
+                         .map(ArtworkImage::getUrl)
+                         .toList();
+        s3StorageService.deleteFiles(urls);
+        repository.deleteAll(images);
     }
 }
