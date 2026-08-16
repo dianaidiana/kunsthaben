@@ -112,7 +112,7 @@ public class UserService {
     @Transactional
     public void delete(Long id) {
         var user = fetchUser(id);
-        artworkImageService.deleteAllImagesForArtist(id);
+        artworkImageService.deleteAllS3ImagesForArtist(id);
         if (user.getAvatarUrl() != null) {
             s3StorageService.deleteFile(user.getAvatarUrl());
         }

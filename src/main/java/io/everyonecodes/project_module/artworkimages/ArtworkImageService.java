@@ -109,7 +109,7 @@ public class ArtworkImageService {
     }
 
     @Transactional
-    public void deleteAllImagesForArtist(Long artistId) {
+    public void deleteAllS3ImagesForArtist(Long artistId) {
         var urls = repository.findArtworkImageByArtworkArtistId(artistId).stream()
                              .map(ArtworkImage::getUrl)
                              .toList();

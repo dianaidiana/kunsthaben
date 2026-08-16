@@ -283,7 +283,7 @@ class UserServiceTest {
 
         service.delete(1L);
 
-        verify(artworkImageService).deleteAllImagesForArtist(1L);
+        verify(artworkImageService).deleteAllS3ImagesForArtist(1L);
         verify(repository).delete(user);
     }
 
