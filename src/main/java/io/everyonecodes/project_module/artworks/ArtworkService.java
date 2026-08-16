@@ -1,5 +1,6 @@
 package io.everyonecodes.project_module.artworks;
 
+import io.everyonecodes.project_module.artworkimages.ArtworkImageService;
 import io.everyonecodes.project_module.artworks.dimensions.Dimensions;
 import io.everyonecodes.project_module.artworks.dimensions.Frame;
 import io.everyonecodes.project_module.artworks.dto.ArtworkCardResponse;
@@ -15,7 +16,6 @@ import io.everyonecodes.project_module.classification.media.MediaRepository;
 import io.everyonecodes.project_module.classification.support.Support;
 import io.everyonecodes.project_module.classification.support.SupportRepository;
 import io.everyonecodes.project_module.exceptions.ErrorMessages;
-import io.everyonecodes.project_module.exceptions.ForbiddenException;
 import io.everyonecodes.project_module.exceptions.NotFoundException;
 import io.everyonecodes.project_module.users.UserRepository;
 import org.springframework.data.domain.Page;
@@ -35,13 +35,17 @@ public class ArtworkService {
     private final CategoryRepository categoryRepository;
     private final MediaRepository mediaRepository;
     private final SupportRepository supportRepository;
+    private final ArtworkImageService artworkImageService;
+    private final ArtworkOwnershipService artworkOwnershipService;
 
-    public ArtworkService(ArtworkRepository repository, UserRepository userRepository, CategoryRepository categoryRepository, MediaRepository mediaRepository, SupportRepository supportRepository) {
+    public ArtworkService(ArtworkRepository repository, UserRepository userRepository, CategoryRepository categoryRepository, MediaRepository mediaRepository, SupportRepository supportRepository, ArtworkImageService artworkImageService, ArtworkOwnershipService artworkOwnershipService) {
         this.repository = repository;
         this.userRepository = userRepository;
         this.categoryRepository = categoryRepository;
         this.mediaRepository = mediaRepository;
         this.supportRepository = supportRepository;
+        this.artworkImageService = artworkImageService;
+        this.artworkOwnershipService = artworkOwnershipService;
     }
 
     @Transactional(readOnly = true)
@@ -94,7 +98,7 @@ public class ArtworkService {
 
     @Transactional
     public ArtworkDetailResponse update(Long artistId, Long artworkId, ArtworkUpdateRequest request) {
-        var artwork = fetchOwnedArtwork(artistId, artworkId);
+        var artwork = artworkOwnershipService.fetchOwnedArtwork(artistId, artworkId);
         var category = fetchCategory(request.getCategoryId());
         var medium = fetchMedium(request.getMediumId());
         var support = fetchSupport(request.getSupportId());
@@ -118,32 +122,23 @@ public class ArtworkService {
 
     @Transactional
     public void delete(Long artistId, Long artworkId) {
-        var artwork = fetchOwnedArtwork(artistId, artworkId);
+        var artwork = artworkOwnershipService.fetchOwnedArtwork(artistId, artworkId);
         artwork.setDeletedAt(OffsetDateTime.now());
+        artworkImageService.deleteAllImagesForArtwork(artworkId);
     }
 
     @Transactional
     public ArtworkDetailResponse markReserved(Long artistId, Long artworkId, boolean reserved) {
-        var artwork = fetchOwnedArtwork(artistId, artworkId);
+        var artwork = artworkOwnershipService.fetchOwnedArtwork(artistId, artworkId);
         artwork.setReserved(reserved);
         return ArtworkDetailResponse.from(artwork);
     }
 
     @Transactional
     public ArtworkDetailResponse markSold(Long artistId, Long artworkId, boolean sold) {
-        var artwork = fetchOwnedArtwork(artistId, artworkId);
+        var artwork = artworkOwnershipService.fetchOwnedArtwork(artistId, artworkId);
         artwork.setSold(sold);
         return ArtworkDetailResponse.from(artwork);
-    }
-
-    public Artwork fetchOwnedArtwork(Long artistId, Long artworkId) {
-        var artwork = repository.findByIdAndDeletedAtIsNull(artworkId)
-                                .orElseThrow(() -> new NotFoundException(ErrorMessages.ARTWORK_NOT_FOUND));
-
-        if (!artwork.getArtist().getId().equals(artistId)) {
-            throw new ForbiddenException(ErrorMessages.NOT_ARTWORK_OWNER);
-        }
-        return artwork;
     }
 
     private Category fetchCategory(Long categoryId) {

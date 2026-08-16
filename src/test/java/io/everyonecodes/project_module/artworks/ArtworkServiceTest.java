@@ -1,5 +1,6 @@
 package io.everyonecodes.project_module.artworks;
 
+import io.everyonecodes.project_module.artworkimages.ArtworkImageService;
 import io.everyonecodes.project_module.artworks.dimensions.Dimensions;
 import io.everyonecodes.project_module.artworks.dimensions.Frame;
 import io.everyonecodes.project_module.artworks.dto.ArtworkCardResponse;
@@ -15,6 +16,7 @@ import io.everyonecodes.project_module.classification.media.Media;
 import io.everyonecodes.project_module.classification.media.MediaRepository;
 import io.everyonecodes.project_module.classification.support.Support;
 import io.everyonecodes.project_module.classification.support.SupportRepository;
+import io.everyonecodes.project_module.exceptions.ErrorMessages;
 import io.everyonecodes.project_module.exceptions.ForbiddenException;
 import io.everyonecodes.project_module.exceptions.NotFoundException;
 import io.everyonecodes.project_module.users.User;
@@ -56,6 +58,12 @@ class ArtworkServiceTest {
 
     @Mock
     SupportRepository supportRepository;
+
+    @Mock
+    ArtworkImageService artworkImageService;
+
+    @Mock
+    ArtworkOwnershipService artworkOwnershipService;
 
     private final OffsetDateTime createdAt = OffsetDateTime.parse("2024-01-01T09:15:30Z");
     private final User user = new User(1L, "Bob Ross", "bob@ross.com", "hashhashhash", null, null, "Vienna", "1020", null, createdAt);
@@ -136,7 +144,9 @@ class ArtworkServiceTest {
                 userRepository,
                 categoryRepository,
                 mediaRepository,
-                supportRepository
+                supportRepository,
+                artworkImageService,
+                artworkOwnershipService
         );
     }
 
@@ -286,7 +296,7 @@ class ArtworkServiceTest {
 
     @Test
     void updateExistentArtworkByOwner() {
-        when(repository.findByIdAndDeletedAtIsNull(1L)).thenReturn(Optional.of(olderArtwork));
+        when(artworkOwnershipService.fetchOwnedArtwork(1L, 1L)).thenReturn(olderArtwork);
         when(categoryRepository.findById(1L)).thenReturn(Optional.of(category));
         when(mediaRepository.findById(1L)).thenReturn(Optional.of(media));
         when(supportRepository.findById(1L)).thenReturn(Optional.of(support));
@@ -311,21 +321,23 @@ class ArtworkServiceTest {
 
     @Test
     void updateUnexistentOrDeletedArtwork() {
-        when(repository.findByIdAndDeletedAtIsNull(1L)).thenReturn(Optional.empty());
+        when(artworkOwnershipService.fetchOwnedArtwork(1L, 1L))
+                .thenThrow(new NotFoundException(ErrorMessages.ARTWORK_NOT_FOUND));
 
         assertThrows(NotFoundException.class, () -> service.update(1L, 1L, artworkUpdateRequest));
     }
 
     @Test
     void updateArtworkNotOwnedByCaller() {
-        when(repository.findByIdAndDeletedAtIsNull(1L)).thenReturn(Optional.of(olderArtwork));
+        when(artworkOwnershipService.fetchOwnedArtwork(2L, 1L))
+                .thenThrow(new ForbiddenException(ErrorMessages.NOT_ARTWORK_OWNER));
 
         assertThrows(ForbiddenException.class, () -> service.update(2L, 1L, artworkUpdateRequest));
     }
 
     @Test
     void updateWithUnexistentCategory() {
-        when(repository.findByIdAndDeletedAtIsNull(1L)).thenReturn(Optional.of(olderArtwork));
+        when(artworkOwnershipService.fetchOwnedArtwork(1L, 1L)).thenReturn(olderArtwork);
         when(categoryRepository.findById(1L)).thenReturn(Optional.empty());
 
         assertThrows(NotFoundException.class, () -> service.update(1L, 1L, artworkUpdateRequest));
@@ -333,7 +345,7 @@ class ArtworkServiceTest {
 
     @Test
     void updateWithUnexistentMedium() {
-        when(repository.findByIdAndDeletedAtIsNull(1L)).thenReturn(Optional.of(olderArtwork));
+        when(artworkOwnershipService.fetchOwnedArtwork(1L, 1L)).thenReturn(olderArtwork);
         when(categoryRepository.findById(1L)).thenReturn(Optional.of(category));
         when(mediaRepository.findById(1L)).thenReturn(Optional.empty());
 
@@ -342,7 +354,7 @@ class ArtworkServiceTest {
 
     @Test
     void updateWithUnexistentSupport() {
-        when(repository.findByIdAndDeletedAtIsNull(1L)).thenReturn(Optional.of(olderArtwork));
+        when(artworkOwnershipService.fetchOwnedArtwork(1L, 1L)).thenReturn(olderArtwork);
         when(categoryRepository.findById(1L)).thenReturn(Optional.of(category));
         when(mediaRepository.findById(1L)).thenReturn(Optional.of(media));
         when(supportRepository.findById(1L)).thenReturn(Optional.empty());
@@ -352,30 +364,33 @@ class ArtworkServiceTest {
 
     @Test
     void deleteExistentArtworkByOwner() {
-        when(repository.findByIdAndDeletedAtIsNull(1L)).thenReturn(Optional.of(olderArtwork));
+        when(artworkOwnershipService.fetchOwnedArtwork(1L, 1L)).thenReturn(olderArtwork);
         service.delete(1L, 1L);
 
         assertNotNull(olderArtwork.getDeletedAt());
         verify(repository, never()).delete(any(Artwork.class));
+        verify(artworkImageService).deleteAllImagesForArtwork(1L);
     }
 
     @Test
     void deleteUnexistentOrDeletedArtwork() {
-        when(repository.findByIdAndDeletedAtIsNull(1L)).thenReturn(Optional.empty());
+        when(artworkOwnershipService.fetchOwnedArtwork(1L, 1L))
+                .thenThrow(new NotFoundException(ErrorMessages.ARTWORK_NOT_FOUND));
 
         assertThrows(NotFoundException.class, () -> service.delete(1L, 1L));
     }
 
     @Test
     void deleteArtworkNotOwnedByCaller() {
-        when(repository.findByIdAndDeletedAtIsNull(1L)).thenReturn(Optional.of(olderArtwork));
+        when(artworkOwnershipService.fetchOwnedArtwork(2L, 1L))
+                .thenThrow(new ForbiddenException(ErrorMessages.NOT_ARTWORK_OWNER));
 
         assertThrows(ForbiddenException.class, () -> service.delete(2L, 1L));
     }
 
     @Test
     void markReservedTrueByOwner() {
-        when(repository.findByIdAndDeletedAtIsNull(1L)).thenReturn(Optional.of(olderArtwork));
+        when(artworkOwnershipService.fetchOwnedArtwork(1L, 1L)).thenReturn(olderArtwork);
 
         var result = service.markReserved(1L, 1L, true);
 
@@ -385,7 +400,7 @@ class ArtworkServiceTest {
     @Test
     void markReservedFalseByOwner() {
         olderArtwork.setReserved(true);
-        when(repository.findByIdAndDeletedAtIsNull(1L)).thenReturn(Optional.of(olderArtwork));
+        when(artworkOwnershipService.fetchOwnedArtwork(1L, 1L)).thenReturn(olderArtwork);
 
         var result = service.markReserved(1L, 1L, false);
 
@@ -394,21 +409,23 @@ class ArtworkServiceTest {
 
     @Test
     void markReservedUnexistentArtwork() {
-        when(repository.findByIdAndDeletedAtIsNull(1L)).thenReturn(Optional.empty());
+        when(artworkOwnershipService.fetchOwnedArtwork(1L, 1L))
+                .thenThrow(new NotFoundException(ErrorMessages.ARTWORK_NOT_FOUND));
 
         assertThrows(NotFoundException.class, () -> service.markReserved(1L, 1L, true));
     }
 
     @Test
     void markReservedNotOwnedByCaller() {
-        when(repository.findByIdAndDeletedAtIsNull(1L)).thenReturn(Optional.of(olderArtwork));
+        when(artworkOwnershipService.fetchOwnedArtwork(2L, 1L))
+                .thenThrow(new ForbiddenException(ErrorMessages.NOT_ARTWORK_OWNER));
 
         assertThrows(ForbiddenException.class, () -> service.markReserved(2L, 1L, true));
     }
 
     @Test
     void markSoldTrueByOwner() {
-        when(repository.findByIdAndDeletedAtIsNull(1L)).thenReturn(Optional.of(olderArtwork));
+        when(artworkOwnershipService.fetchOwnedArtwork(1L, 1L)).thenReturn(olderArtwork);
 
         var result = service.markSold(1L, 1L, true);
 
@@ -418,7 +435,7 @@ class ArtworkServiceTest {
     @Test
     void markSoldFalseByOwner() {
         olderArtwork.setSold(true);
-        when(repository.findByIdAndDeletedAtIsNull(1L)).thenReturn(Optional.of(olderArtwork));
+        when(artworkOwnershipService.fetchOwnedArtwork(1L, 1L)).thenReturn(olderArtwork);
 
         var result = service.markSold(1L, 1L, false);
 
@@ -427,16 +444,17 @@ class ArtworkServiceTest {
 
     @Test
     void markSoldUnexistentArtwork() {
-        when(repository.findByIdAndDeletedAtIsNull(1L)).thenReturn(Optional.empty());
+        when(artworkOwnershipService.fetchOwnedArtwork(1L, 1L))
+                .thenThrow(new NotFoundException(ErrorMessages.ARTWORK_NOT_FOUND));
 
         assertThrows(NotFoundException.class, () -> service.markSold(1L, 1L, true));
     }
 
     @Test
     void markSoldNotOwnedByCaller() {
-        when(repository.findByIdAndDeletedAtIsNull(1L)).thenReturn(Optional.of(olderArtwork));
+        when(artworkOwnershipService.fetchOwnedArtwork(2L, 1L))
+                .thenThrow(new ForbiddenException(ErrorMessages.NOT_ARTWORK_OWNER));
 
         assertThrows(ForbiddenException.class, () -> service.markSold(2L, 1L, true));
     }
 }
-
