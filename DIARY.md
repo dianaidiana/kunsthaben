@@ -1,5 +1,185 @@
 # Diary of my project (or what I've learnt today):
 
+### What a unit test can and can't prove about `@Transactional`
+
+Wanted my test to prove that if the S3 delete fails, the database delete doesn't persist either
+(rollback). Learned that a plain Mockito unit test literally cannot show this: my test builds the
+service with `new ArtworkImageService(repository, artworkService, s3StorageService)` directly,
+never through Spring, so `@Transactional`'s proxy is never involved at all. So there's no real
+transaction, `repository` is just a mock recording which methods were called on
+it.
+
+So `verify(repository).delete(artworkImage2)` after a simulated S3 failure only proves that the
+code *called* delete before the S3 call blew up, i.e. that the order of operations is right
+(which is exactly what makes the real rollback safe once this runs for real, inside Spring). It
+doesn't prove anything actually got undone. To really test "nothing gets persisted when S3 fails"
+I'd need a proper `@SpringBootTest` integration test with a real database, letting `@Transactional`
+actually do its job.
+
+## 12.08 Wiring S3 into the app
+
+### `S3StorageService`
+
+Built a small class whose only job is talking to S3. `uploadFile(MultipartFile)` builds the object
+key from a random `UUID` plus the original file extension — not the original filename — because
+two different artists both uploading `image.jpg` would otherwise silently overwrite each other's
+file:
+
+```java
+public String uploadFile(MultipartFile file) {
+    var key = UUID.randomUUID() + extensionOf(file.getOriginalFilename());
+    s3Client.putObject(
+            PutObjectRequest.builder().bucket(bucketName).key(key)
+                            .contentType(file.getContentType()).build(),
+            RequestBody.fromInputStream(file.getInputStream(), file.getSize())
+    );
+    return "https://%s.s3.%s.amazonaws.com/%s".formatted(bucketName, region, key);
+}
+```
+
+### Rewiring `ArtworkImageService`
+
+Before this, `addImage` just trusted a `url` string sent by the client. Now the endpoint receives
+the actual file (`multipart/form-data`), and the flow is: check the artist owns the artwork, check
+the image cap, validate the file, upload it through `S3StorageService`, save the URL it hands
+back. Also had to build `ArtworkImageController` itself — it didn't exist before, only the
+service/repository layer did.
+
+### Bug: `NoSuchBucketException`
+
+First real upload attempt threw `NoSuchBucketException: The specified bucket does not exist`. The
+request was reaching AWS fine (so credentials were working), it just couldn't find a bucket by the
+name in my `application.properties`. Turned out the name I originally picked was already taken —
+S3 bucket names are unique **globally**, across every AWS account in existence, not just mine — so
+when I created the bucket, AWS silently suggested a longer, actually-unique name
+(`kunsthaben-artwork-images-<account-id>-<region>-<suffix>`), and that's the one that actually got
+created. Just had to update the property to match reality.
+
+### Region question
+
+Asked whether it mattered that I picked `eu-north-1` (Stockholm) while being in Austria. Short
+answer: not really, at this scale — maybe 10-20ms extra latency versus Frankfurt, imperceptible
+for a school project, and if anything Stockholm tends to be slightly *cheaper* than
+`eu-central-1`. Region choice only really matters if my own server (the compute) is *also* running
+inside AWS in a specific region — then keeping compute and storage in the same region avoids
+cross-region latency/cost. Since my app just runs locally and calls out to S3 over the internet
+regardless of where I deploy it, that doesn't apply here.
+
+### "Will I need a new bucket if I deploy this online?"
+
+No — this was a genuine misconception I had. A bucket is reachable over HTTPS from literally
+anywhere; region only describes where the bytes physically live, not who's allowed to reach them.
+My app can run on my laptop, a VPS, wherever, and keep using the exact same bucket the whole time.
+The only case where region-matching is worth optimizing for is deploying the compute itself inside
+AWS in a specific region — a deliberate choice, not something required just because the app went
+"online."
+
+## 11.08 S3 storage setup: IAM, buckets, credentials and the AWS SDK
+
+### What S3 actually is
+
+S3 (Simple Storage Service) is AWS's object storage. A place to store files
+("objects") and get a URL back. A **bucket** is a namespace/container for objects; it's not a real
+folder system even though the console displays it that way.
+
+### The AWS Free Plan
+
+New AWS accounts get a **Free Plan**: $100 in credit, usable for 185 days (6 months). The
+important part: this is a hard cap, not classic pay-as-you-go. If I ever went over the credit
+within that window, AWS doesn't charge me, it just shuts the account down (data kept for 90 days,
+so I'd have a chance to upgrade and recover it). That's genuinely different from a normal AWS
+account with a card attached and no ceiling, and it's the reason I felt comfortable going ahead
+with a real AWS account for a school project instead of something else.
+
+### IAM and policies
+
+**IAM** (Identity and Access Management) is AWS's system for controlling *who* can do *what* on
+*which* resources. Instead of using my main/root account credentials in the app (full
+account access, no boundaries), I created a separate **IAM user** just for this project.
+
+A **policy** is a JSON document you attach to that user, listing exactly which actions are
+allowed, on exactly which resources. Mine only grants `s3:PutObject`/`s3:DeleteObject`, scoped to
+this one bucket's ARN:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:PutObject",
+        "s3:DeleteObject"
+      ],
+      "Resource": "arn:aws:s3:::YOUR-BUCKET-NAME/*"
+    }
+  ]
+}
+```
+
+This is the "least privilege" idea: if these specific credentials ever leaked, the damage is
+capped at "someone can write/delete objects in this one bucket," not "someone owns my AWS
+account."
+
+### Creating the bucket
+
+Picked a region (`eu-north-1`, Stockholm) and a name. Left "Block all public access" on at the
+bucket level, and instead added a narrow bucket policy allowing public *read-only* access
+(`s3:GetObject` only) — so uploaded images can be viewed via a plain URL in a browser, without
+opening up writing/listing/deleting to the whole internet.
+
+### Saving credentials without putting them in the repo
+
+Instead of pasting the access key/secret into `application.properties` (where they could easily
+end up committed to git by accident), I saved them as a **named profile** in `~/.aws/credentials`:
+
+```
+[kunsthaben]
+aws_access_key_id = ...
+aws_secret_access_key = ...
+```
+
+and pointed the Java code at that profile by name, so the actual secret values never touch the
+repo at all:
+
+```java
+S3Client.builder().
+
+region(Region.of(region)).
+
+credentialsProvider(ProfileCredentialsProvider.create("kunsthaben")).
+
+build();
+```
+
+### pom.xml dependencies
+
+Needed the AWS SDK for Java v2. Added their BOM first (Bill of Materials, a shared version list,
+so I don't have to manually pick a compatible version for every single AWS artifact), then the
+actual `s3` artifact with no version needed since the BOM supplies it:
+
+```xml
+
+<dependencyManagement>
+    <dependencies>
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>bom</artifactId>
+            <version>2.29.10</version>
+            <type>pom</type>
+            <scope>import</scope>
+        </dependency>
+    </dependencies>
+</dependencyManagement>
+```
+
+### What `S3Client` is
+
+`S3Client` is the actual object my code uses to talk to S3 — every `putObject`/`deleteObject` call
+goes through it. Built it once as a Spring `@Bean` in a small `S3Config` class (region + the
+profile credentials provider above), so the whole app reuses one client instead of creating a new
+one per request.
+
 ## 07.08 Concurrency: why `@Transactional` doesn't prevent race conditions
 
 `ArtworkImageService.addImage`'s cap check (`MAX_IMAGES_PER_ARTWORK`) is a classic
