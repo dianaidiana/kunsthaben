@@ -1,4 +1,4 @@
-package io.everyonecodes.project_module.config;
+package io.everyonecodes.project_module.storage.config;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
