@@ -44,4 +44,7 @@ public final class ErrorMessages {
 
     public static final String SELF_FOLLOW = "Self-following is not permitted";
     public static final String DUPLICATE_FOLLOW = "Follow already exists";
+
+    public static final String INVALID_CREDENTIALS = "Invalid credentials";
+    public static final String INVALID_TOKEN = "invalid token";
 }
