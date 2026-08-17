@@ -40,6 +40,13 @@ public class ApiExceptionHandler {
                 .body(e.getMessage());
     }
 
+    @ExceptionHandler(UnauthorizedException.class)
+    public ResponseEntity<String> handleUnauthorizedException(UnauthorizedException e) {
+        return ResponseEntity
+                .status(HttpStatus.UNAUTHORIZED)
+                .body(e.getMessage());
+    }
+
     // Thrown by Spring MVC itself. It carries a BindingResult with one FieldError per failed constraint
     // (field name + the message from the annotation, e.g. @NotBlank(message = "...")).
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -47,18 +54,24 @@ public class ApiExceptionHandler {
         Map<String, String> errors = new HashMap<>();
         e.getBindingResult().getFieldErrors()
          .forEach(error -> errors.put(error.getField(), error.getDefaultMessage()));
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errors);
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(errors);
     }
 
     // Entity validation failure (Hibernate/JPA)
     @ExceptionHandler(jakarta.validation.ConstraintViolationException.class)
     public ResponseEntity<String> handleEntityValidation(jakarta.validation.ConstraintViolationException e) {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(e.getMessage());
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<String> handleEntityValidation(IllegalArgumentException e) {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(e.getMessage());
     }
 }
 
