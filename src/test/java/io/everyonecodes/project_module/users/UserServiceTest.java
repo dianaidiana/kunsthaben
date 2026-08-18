@@ -45,7 +45,7 @@ class UserServiceTest {
 
     @BeforeEach
     void setup() {
-        service = new UserService(repository, s3StorageService, artworkImageService);
+        service = new UserService(repository, s3StorageService, artworkImageService, encoder);
     }
 
     private static MockMultipartFile validImageFile() {
