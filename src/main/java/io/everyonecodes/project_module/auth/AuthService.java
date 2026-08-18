@@ -40,4 +40,8 @@ public class AuthService {
                                  .orElseThrow(() -> new UnauthorizedException(ErrorMessages.INVALID_CREDENTIALS));
         return new AuthResponse(jwtService.generateToken(user.getId(), user.getEmail()));
     }
+
+    public String issueToken(Long userId, String email) {
+        return jwtService.generateToken(userId, email);
+    }
 }
