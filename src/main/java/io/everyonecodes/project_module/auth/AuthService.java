@@ -38,6 +38,6 @@ public class AuthService {
 
         var user = userRepository.findByEmail(request.getEmail())
                                  .orElseThrow(() -> new UnauthorizedException(ErrorMessages.INVALID_CREDENTIALS));
-        return new AuthResponse(jwtService.generateToken(user));
+        return new AuthResponse(jwtService.generateToken(user.getId(), user.getEmail()));
     }
 }

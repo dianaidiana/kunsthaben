@@ -1,6 +1,5 @@
 package io.everyonecodes.project_module.auth;
 
-import io.everyonecodes.project_module.users.User;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
@@ -21,12 +20,12 @@ public class JwtService {
     }
 
 
-    public String generateToken(User user) {
+    public String generateToken(Long userId, String email) {
         var now = new Date();
         var expiry = new Date(now.getTime() + expirationMs);
         return Jwts.builder()
-                   .subject(user.getEmail())
-                   .claim("userId", user.getId())
+                   .subject(email)
+                   .claim("userId", userId)
                    .issuedAt(now)
                    .expiration(expiry)
                    .signWith(key)
