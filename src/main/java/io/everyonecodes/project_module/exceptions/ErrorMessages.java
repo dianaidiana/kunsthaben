@@ -22,6 +22,7 @@ public final class ErrorMessages {
 
     public static final String NAME_REQUIRED = "name should not be empty";
     public static final String CODE_REQUIRED = "code should not be empty";
+    public static final String EMAIL_REQUIRED = "email should not be empty";
     public static final String EMAIL_INVALID = "invalid email";
     public static final String PASSWORD_REQUIRED = "password should not be empty";
     public static final String PASSWORD_HASH_REQUIRED = "password hash should not be empty";
