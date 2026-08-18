@@ -10,7 +10,7 @@ import io.everyonecodes.project_module.users.dto.UserRegisterRequest;
 import io.everyonecodes.project_module.users.dto.UserResponse;
 import io.everyonecodes.project_module.users.dto.UserUpdateRequest;
 import jakarta.transaction.Transactional;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -25,14 +25,15 @@ public class UserService {
     private final UserRepository repository;
     private final S3StorageService s3StorageService;
     private final ArtworkImageService artworkImageService;
-    private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
+    private final PasswordEncoder encoder;
 
     private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of("image/jpeg", "image/png", "image/webp");
 
-    public UserService(UserRepository repository, S3StorageService s3StorageService, ArtworkImageService artworkImageService) {
+    public UserService(UserRepository repository, S3StorageService s3StorageService, ArtworkImageService artworkImageService, PasswordEncoder encoder) {
         this.repository = repository;
         this.s3StorageService = s3StorageService;
         this.artworkImageService = artworkImageService;
+        this.encoder = encoder;
     }
 
     public UserResponse register(UserRegisterRequest userRequest) {
