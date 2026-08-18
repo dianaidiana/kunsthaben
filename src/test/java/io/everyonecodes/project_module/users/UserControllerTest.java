@@ -1,6 +1,6 @@
 package io.everyonecodes.project_module.users;
 
-import io.everyonecodes.project_module.auth.JwtService;
+import io.everyonecodes.project_module.auth.AuthService;
 import io.everyonecodes.project_module.exceptions.ConflictException;
 import io.everyonecodes.project_module.exceptions.ErrorMessages;
 import io.everyonecodes.project_module.exceptions.NotFoundException;
@@ -35,7 +35,7 @@ public class UserControllerTest {
     UserService service;
 
     @MockitoBean
-    JwtService jwtService;
+    AuthService authService;
 
     @Autowired
     RestTestClient client;
@@ -60,7 +60,7 @@ public class UserControllerTest {
     void registerSuccessfully() {
         var request = new UserRegisterRequest("Bob Ross", "bob@ross.com", "password123");
         when(service.register(any())).thenReturn(expectedUser);
-        when(jwtService.generateToken(1L, "bob@ross.com")).thenReturn("fake-token");
+        when(authService.issueToken(1L, "bob@ross.com")).thenReturn("fake-token");
 
         UserRegisterResponse response = client.post()
                                       .uri("/user/register")

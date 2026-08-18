@@ -1,6 +1,6 @@
 package io.everyonecodes.project_module.users;
 
-import io.everyonecodes.project_module.auth.JwtService;
+import io.everyonecodes.project_module.auth.AuthService;
 import io.everyonecodes.project_module.exceptions.ErrorMessages;
 import io.everyonecodes.project_module.exceptions.NotFoundException;
 import io.everyonecodes.project_module.users.dto.UserRegisterRequest;
@@ -16,18 +16,18 @@ import org.springframework.web.multipart.MultipartFile;
 public class UserController {
 
     private final UserService userService;
-    private final JwtService jwtService;
+    private final AuthService authService;
 
-    public UserController(UserService userService, JwtService jwtService) {
+    public UserController(UserService userService, AuthService authService) {
         this.userService = userService;
-        this.jwtService = jwtService;
+        this.authService = authService;
     }
 
     @ResponseStatus(HttpStatus.CREATED)
     @PostMapping("/user/register")
     UserRegisterResponse register(@Valid @RequestBody UserRegisterRequest userRequest) {
         var user = userService.register(userRequest);
-        var token = jwtService.generateToken(user.getId(), user.getEmail());
+        var token = authService.issueToken(user.getId(), user.getEmail());
         return new UserRegisterResponse(user, token);
     }
 
