@@ -1,8 +1,10 @@
 package io.everyonecodes.project_module.users;
 
+import io.everyonecodes.project_module.auth.JwtService;
 import io.everyonecodes.project_module.exceptions.ErrorMessages;
 import io.everyonecodes.project_module.exceptions.NotFoundException;
 import io.everyonecodes.project_module.users.dto.UserRegisterRequest;
+import io.everyonecodes.project_module.users.dto.UserRegisterResponse;
 import io.everyonecodes.project_module.users.dto.UserResponse;
 import io.everyonecodes.project_module.users.dto.UserUpdateRequest;
 import jakarta.validation.Valid;
@@ -14,15 +16,19 @@ import org.springframework.web.multipart.MultipartFile;
 public class UserController {
 
     private final UserService userService;
+    private final JwtService jwtService;
 
-    public UserController(UserService userService) {
+    public UserController(UserService userService, JwtService jwtService) {
         this.userService = userService;
+        this.jwtService = jwtService;
     }
 
     @ResponseStatus(HttpStatus.CREATED)
     @PostMapping("/user/register")
-    UserResponse register(@Valid @RequestBody UserRegisterRequest userRequest) {
-        return userService.register(userRequest);
+    UserRegisterResponse register(@Valid @RequestBody UserRegisterRequest userRequest) {
+        var user = userService.register(userRequest);
+        var token = jwtService.generateToken(user.getId(), user.getEmail());
+        return new UserRegisterResponse(user, token);
     }
 
     @GetMapping("/user/{id}")

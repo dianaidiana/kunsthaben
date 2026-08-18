@@ -1,9 +1,11 @@
 package io.everyonecodes.project_module.users;
 
+import io.everyonecodes.project_module.auth.JwtService;
 import io.everyonecodes.project_module.exceptions.ConflictException;
 import io.everyonecodes.project_module.exceptions.ErrorMessages;
 import io.everyonecodes.project_module.exceptions.NotFoundException;
 import io.everyonecodes.project_module.users.dto.UserRegisterRequest;
+import io.everyonecodes.project_module.users.dto.UserRegisterResponse;
 import io.everyonecodes.project_module.users.dto.UserResponse;
 import io.everyonecodes.project_module.users.dto.UserUpdateRequest;
 import org.junit.jupiter.api.Test;
@@ -32,6 +34,9 @@ public class UserControllerTest {
     @MockitoBean
     UserService service;
 
+    @MockitoBean
+    JwtService jwtService;
+
     @Autowired
     RestTestClient client;
 
@@ -55,17 +60,18 @@ public class UserControllerTest {
     void registerSuccessfully() {
         var request = new UserRegisterRequest("Bob Ross", "bob@ross.com", "password123");
         when(service.register(any())).thenReturn(expectedUser);
+        when(jwtService.generateToken(1L, "bob@ross.com")).thenReturn("fake-token");
 
-        UserResponse response = client.post()
+        UserRegisterResponse response = client.post()
                                       .uri("/user/register")
                                       .contentType(MediaType.APPLICATION_JSON)
                                       .body(request)
                                       .exchange()
                                       .expectStatus().isCreated()
-                                      .expectBody(UserResponse.class)
+                                      .expectBody(UserRegisterResponse.class)
                                       .returnResult()
                                       .getResponseBody();
-        assertEquals(expectedUser, response);
+        assertEquals(new UserRegisterResponse(expectedUser, "fake-token"), response);
     }
 
     @Test
