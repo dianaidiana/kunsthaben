@@ -45,7 +45,7 @@ public class UserService {
 
         var password = userRequest.getPassword();
         var passwordHash = encoder.encode(password);
-        var newUser = new User(null, userRequest.getName(), email, passwordHash, null, null, userRequest.getCity(), userRequest.getPostcode(), null, null);
+        var newUser = new User(null, userRequest.getName(), email, passwordHash, null, null, null, null, null, null);
         var savedUser = repository.save(newUser);
         return UserResponse.from(savedUser);
     }

@@ -70,7 +70,7 @@ class UserServiceTest {
     @Test
     void registerSuccessfully() {
 
-        var request = new UserRegisterRequest("Bob Ross", "bob@ross.com", "password123", "Vienna", "1020");
+        var request = new UserRegisterRequest("Bob Ross", "bob@ross.com", "password123");
         when(repository.findByEmail("bob@ross.com")).thenReturn(Optional.empty());
         when(repository.save(any())).thenAnswer(invocation -> {
             User savedUser = invocation.getArgument(0);
@@ -88,13 +88,13 @@ class UserServiceTest {
         assertNotEquals("password123", savedUser.getPasswordHash());
         assertTrue(encoder.matches("password123", savedUser.getPasswordHash()));
 
-        var expectedUserResponse = new UserResponse(1L, "Bob Ross", "bob@ross.com", null, null, "Vienna", "1020", null, createdAt);
+        var expectedUserResponse = new UserResponse(1L, "Bob Ross", "bob@ross.com", null, null, null, null, null, createdAt);
         assertEquals(expectedUserResponse, result);
     }
 
     @Test
     void registerWithTakenEmail() {
-        var request = new UserRegisterRequest("Bob Ross", "bob@ross.com", "password123", "Vienna", "1020");
+        var request = new UserRegisterRequest("Bob Ross", "bob@ross.com", "password123");
         var expectedUser = new User(1L, "Bob Ross", "bob@ross.com", encoder.encode(request.getPassword()), null, null, "Vienna", "1020", null, createdAt);
         when(repository.findByEmail("bob@ross.com")).thenReturn(Optional.of(expectedUser));
 

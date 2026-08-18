@@ -53,7 +53,7 @@ public class UserControllerTest {
 
     @Test
     void registerSuccessfully() {
-        var request = new UserRegisterRequest("Bob Ross", "bob@ross.com", "password123", "Vienna", "1020");
+        var request = new UserRegisterRequest("Bob Ross", "bob@ross.com", "password123");
         when(service.register(any())).thenReturn(expectedUser);
 
         UserResponse response = client.post()
@@ -70,7 +70,7 @@ public class UserControllerTest {
 
     @Test
     void registerWithTakenEmail() {
-        var request = new UserRegisterRequest("Bob Ross", "bob@ross.com", "password123", "Vienna", "1020");
+        var request = new UserRegisterRequest("Bob Ross", "bob@ross.com", "password123");
         when(service.register(any())).thenThrow(new ConflictException(ErrorMessages.EMAIL_ALREADY_TAKEN));
 
         client.post()

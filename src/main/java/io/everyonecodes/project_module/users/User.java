@@ -45,12 +45,10 @@ public class User {
     @URL(message = ErrorMessages.AVATAR_URL_INVALID)
     private String avatarUrl;
 
-    @Column(columnDefinition = "TEXT", nullable = false)
-    @NotBlank(message = ErrorMessages.CITY_REQUIRED)
+    @Column(columnDefinition = "TEXT")
     private String city;
 
-    @Column(columnDefinition = "TEXT", nullable = false)
-    @NotBlank(message = ErrorMessages.POSTCODE_REQUIRED)
+    @Column(columnDefinition = "TEXT")
     private String postcode;
 
     @Column(columnDefinition = "TEXT")

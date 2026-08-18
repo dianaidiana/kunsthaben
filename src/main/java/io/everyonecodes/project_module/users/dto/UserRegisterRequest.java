@@ -17,15 +17,10 @@ public class UserRegisterRequest {
     @NotBlank(message = ErrorMessages.NAME_REQUIRED)
     private final String name;
 
+    @NotBlank(message = ErrorMessages.EMAIL_REQUIRED)
     @Email(message = ErrorMessages.EMAIL_INVALID)
     private final String email;
 
     @NotBlank(message = ErrorMessages.PASSWORD_REQUIRED)
     private String password;
-
-    @NotBlank(message = ErrorMessages.CITY_REQUIRED)
-    private String city;
-
-    @NotBlank(message = ErrorMessages.POSTCODE_REQUIRED)
-    private String postcode;
 }
