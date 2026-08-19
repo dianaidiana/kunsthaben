@@ -4,6 +4,7 @@ import io.everyonecodes.project_module.artworks.dto.ArtworkCardResponse;
 import io.everyonecodes.project_module.artworks.dto.ArtworkCreateRequest;
 import io.everyonecodes.project_module.artworks.dto.ArtworkDetailResponse;
 import io.everyonecodes.project_module.artworks.dto.ArtworkUpdateRequest;
+import io.everyonecodes.project_module.auth.JwtService;
 import io.everyonecodes.project_module.exceptions.ErrorMessages;
 import io.everyonecodes.project_module.exceptions.ForbiddenException;
 import io.everyonecodes.project_module.exceptions.NotFoundException;
@@ -36,6 +37,9 @@ class ArtworkControllerTest {
 
     @Autowired
     RestTestClient client;
+
+    @Autowired
+    JwtService jwtService;
 
     private final OffsetDateTime createdAt = OffsetDateTime.parse("2024-01-01T09:15:30Z");
 
@@ -149,10 +153,12 @@ class ArtworkControllerTest {
 
     @Test
     void createSuccessfully() {
+        var token = jwtService.generateToken(1L, "bob@ross.com");
         when(service.create(eq(1L), any())).thenReturn(expectedDetail);
 
         ArtworkDetailResponse response = client.post()
                                                .uri("/user/1/artwork")
+                                               .header("Authorization", "Bearer " + token)
                                                .contentType(MediaType.APPLICATION_JSON)
                                                .body(createRequest)
                                                .exchange()
@@ -166,10 +172,12 @@ class ArtworkControllerTest {
 
     @Test
     void createWithUnexistentArtist() {
+        var token = jwtService.generateToken(1L, "bob@ross.com");
         when(service.create(eq(1L), any())).thenThrow(new NotFoundException(ErrorMessages.USER_NOT_FOUND));
 
         client.post()
               .uri("/user/1/artwork")
+              .header("Authorization", "Bearer " + token)
               .contentType(MediaType.APPLICATION_JSON)
               .body(createRequest)
               .exchange()
@@ -177,11 +185,26 @@ class ArtworkControllerTest {
     }
 
     @Test
+    void createAsDifferentArtist() {
+        var token = jwtService.generateToken(2L, "someone-else@example.com");
+
+        client.post()
+              .uri("/user/1/artwork")
+              .header("Authorization", "Bearer " + token)
+              .contentType(MediaType.APPLICATION_JSON)
+              .body(createRequest)
+              .exchange()
+              .expectStatus().isForbidden();
+    }
+
+    @Test
     void updateSuccessfully() {
+        var token = jwtService.generateToken(1L, "bob@ross.com");
         when(service.update(eq(1L), eq(1L), any())).thenReturn(expectedDetail);
 
         ArtworkDetailResponse response = client.put()
                                                .uri("/user/1/artwork/1")
+                                               .header("Authorization", "Bearer " + token)
                                                .contentType(MediaType.APPLICATION_JSON)
                                                .body(updateRequest)
                                                .exchange()
@@ -195,10 +218,25 @@ class ArtworkControllerTest {
 
     @Test
     void updateArtworkNotOwnedByCaller() {
+        var token = jwtService.generateToken(1L, "bob@ross.com");
         when(service.update(eq(1L), eq(1L), any())).thenThrow(new ForbiddenException(ErrorMessages.NOT_ARTWORK_OWNER));
 
         client.put()
               .uri("/user/1/artwork/1")
+              .header("Authorization", "Bearer " + token)
+              .contentType(MediaType.APPLICATION_JSON)
+              .body(updateRequest)
+              .exchange()
+              .expectStatus().isForbidden();
+    }
+
+    @Test
+    void updateAsDifferentArtist() {
+        var token = jwtService.generateToken(2L, "someone-else@example.com");
+
+        client.put()
+              .uri("/user/1/artwork/1")
+              .header("Authorization", "Bearer " + token)
               .contentType(MediaType.APPLICATION_JSON)
               .body(updateRequest)
               .exchange()
@@ -207,8 +245,11 @@ class ArtworkControllerTest {
 
     @Test
     void deleteSuccessfully() {
+        var token = jwtService.generateToken(1L, "bob@ross.com");
+
         client.delete()
               .uri("/user/1/artwork/1")
+              .header("Authorization", "Bearer " + token)
               .exchange()
               .expectStatus().isNoContent();
 
@@ -217,20 +258,35 @@ class ArtworkControllerTest {
 
     @Test
     void deleteUnexistentArtwork() {
+        var token = jwtService.generateToken(1L, "bob@ross.com");
         doThrow(new NotFoundException(ErrorMessages.ARTWORK_NOT_FOUND)).when(service).delete(1L, 1L);
 
         client.delete()
               .uri("/user/1/artwork/1")
+              .header("Authorization", "Bearer " + token)
               .exchange()
               .expectStatus().isNotFound();
     }
 
     @Test
+    void deleteAsDifferentArtist() {
+        var token = jwtService.generateToken(2L, "someone-else@example.com");
+
+        client.delete()
+              .uri("/user/1/artwork/1")
+              .header("Authorization", "Bearer " + token)
+              .exchange()
+              .expectStatus().isForbidden();
+    }
+
+    @Test
     void markReservedSuccessfully() {
+        var token = jwtService.generateToken(1L, "bob@ross.com");
         when(service.markReserved(eq(1L), eq(1L), eq(true))).thenReturn(expectedDetail);
 
         ArtworkDetailResponse response = client.patch()
                                                .uri("/user/1/artwork/1/reserved?reserved={reserved}", true)
+                                               .header("Authorization", "Bearer " + token)
                                                .exchange()
                                                .expectStatus().isOk()
                                                .expectBody(ArtworkDetailResponse.class)
@@ -241,11 +297,24 @@ class ArtworkControllerTest {
     }
 
     @Test
+    void markReservedAsDifferentArtist() {
+        var token = jwtService.generateToken(2L, "someone-else@example.com");
+
+        client.patch()
+              .uri("/user/1/artwork/1/reserved?reserved={reserved}", true)
+              .header("Authorization", "Bearer " + token)
+              .exchange()
+              .expectStatus().isForbidden();
+    }
+
+    @Test
     void markSoldSuccessfully() {
+        var token = jwtService.generateToken(1L, "bob@ross.com");
         when(service.markSold(eq(1L), eq(1L), eq(true))).thenReturn(expectedDetail);
 
         ArtworkDetailResponse response = client.patch()
                                                .uri("/user/1/artwork/1/sold?sold={sold}", true)
+                                               .header("Authorization", "Bearer " + token)
                                                .exchange()
                                                .expectStatus().isOk()
                                                .expectBody(ArtworkDetailResponse.class)
@@ -253,5 +322,16 @@ class ArtworkControllerTest {
                                                .getResponseBody();
 
         assertEquals(expectedDetail, response);
+    }
+
+    @Test
+    void markSoldAsDifferentArtist() {
+        var token = jwtService.generateToken(2L, "someone-else@example.com");
+
+        client.patch()
+              .uri("/user/1/artwork/1/sold?sold={sold}", true)
+              .header("Authorization", "Bearer " + token)
+              .exchange()
+              .expectStatus().isForbidden();
     }
 }
