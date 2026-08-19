@@ -9,7 +9,6 @@ public final class ErrorMessages {
     public static final String MEDIA_NOT_FOUND = "Media not found";
     public static final String SUPPORT_NOT_FOUND = "Support not found";
     public static final String USER_NOT_FOUND = "User not found";
-    public static final String ARTIST_NOT_FOUND = "Artist not found";
     public static final String ARTWORK_NOT_FOUND = "Artwork not found";
 
     public static final String NOT_ARTWORK_OWNER = "You do not have permission to modify this artwork";
