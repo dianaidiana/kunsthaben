@@ -1,6 +1,435 @@
 # Diary of my project (or what I've learnt today):
 
-### What a unit test can and can't prove about `@Transactional`
+## 19.08 Authentication: Spring Security, JWT, and how all the pieces talk to each other
+
+This one took a few sessions to actually click, so I'm writing it down properly, end to end, while
+it's fresh.
+
+### The big picture first
+
+Before touching any code, the thing that unlocked everything else for me: **the server is
+stateless between requests**. It doesn't keep a session, a "who's logged in" list, or a token
+anywhere. Every single request has to bring its own proof of identity, a JWT, in the
+`Authorization` header, and the server re-checks that proof from scratch, every time, before doing
+anything else. Nothing is "remembered" from one request to the next.
+
+There are two completely separate phases to this, and keeping them separate in my head is what
+finally made it stick:
+
+1. **Login** (or register): prove who you are once, with a password, get a token back.
+2. **Every request after that**: present the token instead of the password, get let in if it's
+   valid.
+
+### Phase 1: login, step by step
+
+```
+Postman/frontend
+  │  POST /auth/login  { email, password }
+  ▼
+AuthController.login(request)
+  ▼
+AuthService.login(request)
+  │
+  │  authenticationManager.authenticate(
+  │      new UsernamePasswordAuthenticationToken(email, rawPassword))
+  ▼
+AuthenticationManager  (I never built this class, Spring Security assembles it for me)
+  │
+  ├─▶ CustomUserDetailsService.loadUserByUsername(email)
+  │       └─▶ UserRepository.findByEmail(email) → my User row
+  │       └─▶ wraps it as a UserDetails (email, passwordHash, ROLE_USER)
+  │
+  └─▶ PasswordEncoder.matches(rawPassword, passwordHash)
+          true  → returns a populated Authentication (success)
+          false → throws BadCredentialsException
+
+back in AuthService:
+  │  if authenticate() threw → catch → throw UnauthorizedException
+  │  else: userRepository.findByEmail(email) again, to get the numeric id
+  │  jwtService.generateToken(user.getId(), user.getEmail())
+  ▼
+AuthResponse { token }
+  ▼
+client receives the token in the response body.
+Nothing was saved on the server. The server's job is done.
+```
+
+The class that actually decides "is this password right" is `AuthenticationManager`. Spring Security builds one
+automatically the first time it's needed, as long as it
+can find exactly two beans in my app context:
+
+```java
+
+@Bean
+public PasswordEncoder passwordEncoder() {
+    return new BCryptPasswordEncoder();
+}
+```
+
+and my own `CustomUserDetailsService`, which is the only class I had to write to teach Spring
+Security how to find *my* users at all:
+
+```java
+
+@Service
+public class CustomUserDetailsService implements UserDetailsService {
+
+    private final UserRepository userRepository;
+
+    @Override
+    public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
+        User user = userRepository.findByEmail(email)
+                                  .orElseThrow(() -> new UsernameNotFoundException(email));
+
+        return org.springframework.security.core.userdetails.User
+                .withUsername(user.getEmail())
+                .password(user.getPasswordHash())
+                .authorities("ROLE_USER")
+                .build();
+    }
+}
+```
+
+Two things I had to get used to here. First, `UserDetailsService` doesn't know anything about
+*my* `User` entity, that's exactly why this class exists, it's the translation layer between
+Spring Security's generic idea of a user (username, password hash, authorities) and my actual
+domain. Second, Spring Security ships its own class called `User` too
+(`org.springframework.security.core.userdetails.User`), same simple name as mine, so I write it
+fully qualified instead of importing it, to avoid the collision.
+
+Once Spring Security has both beans, it wires them together into something called a
+`DaoAuthenticationProvider` behind the scenes, and that's what `AuthenticationManager.authenticate(...)`
+actually delegates to. I only had to expose the manager itself as a bean so I could inject it:
+
+```java
+
+@Bean
+public AuthenticationManager authenticationManager(AuthenticationConfiguration config) {
+    return config.getAuthenticationManager();
+}
+```
+
+The `UsernamePasswordAuthenticationToken` I pass into `authenticate(...)` is worth pausing on,
+because it shows up twice in this whole system with two different meanings, which confused me at
+first. Here, with the two-argument constructor `(email, rawPassword)`, it means "here's an
+*attempt* to log in, not yet verified." Later, in the filter (phase 2), the exact same class shows
+up again but built differently, and means the opposite: "this is already verified, trust it."
+
+Once `authenticate()` returns successfully (or throws), `AuthService` does one more thing: it
+looks the user up *again* by email, just to get the numeric `id`, since `authenticate()`'s result
+only carries what `UserDetails` exposes, email and password hash, not the id. Then:
+
+```java
+public String generateToken(Long userId, String email) {
+    var now = new Date();
+    var expiry = new Date(now.getTime() + expirationMs);
+    return Jwts.builder()
+               .subject(email)
+               .claim("userId", userId)
+               .issuedAt(now)
+               .expiration(expiry)
+               .signWith(key)
+               .compact();
+}
+```
+
+That's it, that's the whole token: a signed string carrying `userId`, `email`, when it was issued,
+and when it expires. Nothing about the password ends up in it at all, once `matches()` confirmed
+it once, the password's job is done.
+
+### Phase 2: calling a protected endpoint
+
+```
+Postman/frontend
+  │  PUT /user/1   header: Authorization: Bearer <token>   body: {...}
+  ▼
+Spring Security's filter chain (runs before my controller, on every single request)
+  ▼
+JwtAuthenticationFilter.doFilterInternal(...)   ← this one I wrote myself
+  │  reads request.getHeader("Authorization")
+  │  strips "Bearer ", calls jwtService.parseToken(rawToken)
+  │      verifies the signature with jwt.secret, checks exp hasn't passed
+  │      → returns an AuthPrincipal(id, email) if valid, throws if not
+  │  wraps it: new UsernamePasswordAuthenticationToken(principal, null, authorities)
+  │      (this is the OTHER meaning of this class: "already authenticated, trust it")
+  │  SecurityContextHolder.getContext().setAuthentication(authentication)
+  │      lives only for this one request, on this one thread, wiped right after
+  │  chain.doFilter(request, response)  → passes control onward
+  ▼
+Spring Security's authorization check (from my SecurityConfig rules)
+  │  is PUT /user/1 in the permitAll list? No.
+  │  is SecurityContextHolder populated from the step above? Yes → allowed.
+  │  (a missing/invalid token means this step rejects with 403, my controller
+  │   is never even reached)
+  ▼
+DispatcherServlet routes to UserController.update(...)
+  │  @AuthenticationPrincipal AuthPrincipal principal
+  │      Spring Security reads this straight out of SecurityContextHolder and
+  │      hands it to me as a plain method parameter, I never touch the context myself
+  │  throwForbiddenIfNotOwned(principal, id)
+  │      my own rule, not Spring Security's: does the token's owner match the path?
+  │  userService.update(id, updateRequest) → ... → response
+  ▼
+response goes back. SecurityContextHolder is cleared. Next request starts from zero.
+```
+
+`JwtAuthenticationFilter` itself:
+
+```java
+
+@Component
+public class JwtAuthenticationFilter extends OncePerRequestFilter {
+
+    private static final Logger logger = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
+
+    private final JwtService jwtService;
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
+            throws ServletException, IOException {
+        var header = request.getHeader("Authorization");
+
+        if (header != null && header.startsWith("Bearer ")) {
+            try {
+                var principal = jwtService.parseToken(header.substring(7));
+                var authentication = new UsernamePasswordAuthenticationToken(principal, null, List.of());
+                SecurityContextHolder.getContext().setAuthentication(authentication);
+            } catch (Exception e) {
+                logger.warn("JWT validation failed: {}", e.getMessage());
+            }
+        }
+
+        chain.doFilter(request, response);
+    }
+}
+```
+
+The thing I had to understand about `OncePerRequestFilter`: it's a Servlet-level concept, from
+underneath Spring itself, guaranteeing this code runs exactly once per incoming request, before
+any of my own `@RestController` code sees it. The filter never rejects a request on its own, a
+missing or bad token just leaves `SecurityContextHolder` empty, and it's the *next* stage,
+`SecurityConfig`'s rules, that actually decides whether that's allowed for this particular path.
+Swallowing the exception is deliberate, but I now log it (`logger.warn`), so a genuinely broken
+token doesn't disappear silently if something is actually wrong in production.
+
+### SecurityContextHolder, precisely: what it is, and where it actually lives
+
+I kept saying "it sets the context" without being able to answer *where* that context physically
+sits, so worth nailing down properly instead of hand-waving it.
+
+`SecurityContextHolder` is a plain static utility class. Calling
+`SecurityContextHolder.getContext()` doesn't reach into some server-wide shared object, it reaches
+into a **`ThreadLocal`**. A `ThreadLocal` is a Java mechanism for giving each thread its own
+private copy of a variable, invisible to every other thread, even though the code accessing it
+looks completely ordinary and global. So "setting the context" really means: "store this
+`Authentication` in a slot that only *this one thread* can see."
+
+That matters here because of how a Servlet container like Tomcat actually works: an incoming HTTP
+request gets handed to one worker thread, picked from a pool, and that same thread runs the entire
+request from start to finish, `JwtAuthenticationFilter`, the authorization check, my controller
+method, all of it, synchronously, on that one thread. So for the lifetime of a single request,
+"the current thread" and "this request" are effectively the same thing. That's the whole reason
+`SecurityContextHolder.getContext().setAuthentication(...)` in the filter and
+`SecurityContextHolder.getContext().getAuthentication()` later, inside my controller, see the exact
+same `Authentication` object, without me ever passing it explicitly. They're not talking to some
+shared store, they're both just reading the same thread's own private slot, at different points
+in that same thread's execution.
+
+And this is also exactly why it's safe under concurrent requests: if two people hit the API at the
+same instant, they get two different worker threads from the pool, so two completely separate
+`ThreadLocal` slots. Request A's `SecurityContext` is structurally invisible to request B's thread,
+there's no way for one request to accidentally see another's identity.
+
+The "wiped right after" part isn't automatic garbage collection, either. Spring Security has its
+own filter earlier in the chain whose whole job is clearing `SecurityContextHolder` in a `finally`
+block once the response has been sent. That matters because thread pool threads get *reused*: the
+exact same underlying thread that just handled my request will go on to handle a completely
+unrelated later request. Without that explicit clearing, the next request picking up that recycled
+thread could start out already "authenticated" as the previous request's user, which would be a
+real, serious bug. So the cleanup isn't a nicety, it's what makes reusing threads safe at all.
+
+Then, how the `AuthPrincipal` ends up as a controller parameter: `@AuthenticationPrincipal` is
+resolved by Spring MVC's own parameter-resolution system, the same general mechanism that already
+makes `@PathVariable`, `@RequestParam`, and `@RequestBody` work. Spring Security plugs one more
+resolver into it, and that resolver's entire job, when it sees `@AuthenticationPrincipal
+AuthPrincipal principal` on a method, is:
+
+```java
+SecurityContextHolder.getContext().
+
+getAuthentication().
+
+getPrincipal()
+```
+
+cast to whatever type the parameter declares. Since the filter, earlier on this exact same thread,
+built the `Authentication` with my `AuthPrincipal` record as its principal
+(`new UsernamePasswordAuthenticationToken(principal, null, authorities)`), this call just hands
+back that very same object. Nothing is re-parsed, re-verified, or looked up again here, it's the
+same in-memory object, read back out of the same `ThreadLocal`, one step later in the same
+request's lifetime.
+
+One more precise detail worth having, since I asked "does the 3-argument constructor really make
+it *trusted*, or is that just a naming thing": it's a real flag, not just convention.
+`UsernamePasswordAuthenticationToken` has two constructors. The two-argument one, `(principal,
+credentials)`, used in `AuthService` for a login *attempt*, internally calls
+`setAuthenticated(false)`. The three-argument one, `(principal, credentials, authorities)`, used
+in the filter, calls `super.setAuthenticated(true)` automatically. That boolean is the actual
+thing Spring Security's authorization check reads later to decide whether this request counts as
+authenticated at all, it's not inferred from which constructor was used, the constructor is just
+what sets it.
+
+So, end to end, correcting my own summary from before: the request arrives and goes through the
+filter chain regardless of whether the target path is protected, `JwtAuthenticationFilter` runs
+unconditionally and tries to parse a token whenever the header is present, `jwtService.parseToken`
+checks both the signature and the expiration inside that one call, a successful parse builds an
+*already-authenticated* `UsernamePasswordAuthenticationToken`, that gets stored into this request's
+thread-local `SecurityContextHolder` slot, a later stage in the chain checks that slot against
+`SecurityConfig`'s rules to decide if this specific path is allowed to proceed, and finally, once
+it reaches my controller, `@AuthenticationPrincipal` just reads the same slot back out, on the same
+thread, and hands me the `AuthPrincipal` as a plain parameter.
+
+And the config that ties the filter into the rest of Spring Security:
+
+```java
+
+@Configuration
+public class SecurityConfig {
+
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http) {
+        http.csrf(AbstractHttpConfigurer::disable)
+            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .authorizeHttpRequests(auth -> auth
+                    .requestMatchers(HttpMethod.POST, "/user/register").permitAll()
+                    .requestMatchers(HttpMethod.POST, "/auth/login").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/artwork/**", "/user/*/artwork/**").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/user/{id}", "/category/**", "/media/**", "/support/**").permitAll()
+                    .anyRequest().authenticated()
+            )
+            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+
+        return http.build();
+    }
+}
+```
+
+`csrf().disable()` is there because CSRF protection defends against a very specific attack that
+only applies to cookie/session-based logins, where the browser attaches credentials automatically.
+Nothing here is a cookie, the token only ever gets attached because my own client code explicitly
+adds it, so that attack doesn't apply. `STATELESS` tells Spring Security not to create an
+`HttpSession` at all, matching the "no server-side memory" idea from the top of this entry.
+
+### What Spring Security does for me automatically, versus what I actually built
+
+This was the confusing part for the longest time, so writing it out plainly:
+
+**Automatic, just from adding `spring-boot-starter-security` and the two beans:**
+
+- Locking down *every* endpoint by default the moment the dependency is added, before I write any
+  rules at all (a bit alarming the first time, every test went from working to `401` instantly).
+- Assembling an `AuthenticationManager`/`DaoAuthenticationProvider` from my `UserDetailsService` +
+  `PasswordEncoder` beans, without me writing that wiring myself.
+- `SecurityContextHolder` and `@AuthenticationPrincipal`, the mechanism that carries "who is this"
+  from the filter all the way into my controller method as a plain parameter.
+- The `401` vs `403` distinction I kept tripping over: `401` from the *default* lockdown before any
+  `SecurityFilterChain` exists, `403` once my own filter chain exists and an anonymous request hits
+  `.anyRequest().authenticated()`, since Spring Security treats "anonymous" as a real, non-null
+  `Authentication`, just one that isn't authenticated.
+
+**Nothing built in for, I had to write myself:**
+
+- Anything about JWTs at all. Spring Security has zero opinion on JWT, `JwtService` (signing,
+  parsing, expiry) is entirely my own code using the `jjwt` library.
+- `JwtAuthenticationFilter` itself, the bridge between "here's a raw header string" and "here's a
+  populated `SecurityContext`". Spring Security gives me the slot to plug a filter into
+  (`addFilterBefore`), not the filter.
+- `CustomUserDetailsService`, the bridge between Spring Security's generic user concept and my
+  actual `User` entity.
+- Which paths are public and which aren't, that list in `SecurityConfig` is a product decision,
+  not something Spring infers.
+- The ownership check (`throwForbiddenIfNotOwned`) is entirely mine too, and this was a real
+  "aha": Spring Security only answers *"is this request authenticated at all"*, not *"is this
+  authenticated user allowed to touch this specific row"*. That second question, does the token's
+  owner match the `{id}` in the URL, is regular application logic, sitting in the controller,
+  completely outside anything Spring Security itself is aware of.
+
+### Auto-login on register
+
+One small design decision I made along the way: `POST /user/register` now returns a token too,
+not just the created user, so signing up logs you in immediately instead of forcing a second
+`/auth/login` call right after. `UserController` doesn't build the token itself though, it asks
+`AuthService`:
+
+```java
+UserRegisterResponse register(@Valid @RequestBody UserRegisterRequest userRequest) {
+    var user = userService.register(userRequest);
+    var token = authService.issueToken(user.getId(), user.getEmail());
+    return new UserRegisterResponse(user, token);
+}
+```
+
+`AuthService.issueToken` is a one-line pass-through to `JwtService`. Felt a bit silly writing a
+one-line method at first, but the point isn't the line count, it's that `JwtService` stays a
+private implementation detail of the `auth` package. Nothing outside `auth` talks to it directly,
+only `AuthService` does, so if how tokens get built ever changes, there's exactly one place that
+needs to know.
+
+### localStorage vs cookies: the tradeoff I ended up punting on
+
+Once there's a frontend, the token has to live somewhere in the browser, and I spent a while going
+back and forth on this, worth writing down since it's not a "one is right" answer, it's a real
+tradeoff either way.
+
+**`localStorage` (plain JS, `localStorage.setItem`/`getItem`, what a Bearer-token API like mine
+naturally pairs with):**
+
+- Simple. No CORS-with-credentials setup, no CSRF story to build, works the same for a web
+  frontend and a mobile app, since Bearer headers don't care about origins the way cookies do.
+- The real cost: anything JavaScript can read, `localStorage` included, is readable by *any*
+  script running on the page, not just my own code. If the frontend ever has an XSS bug, someone
+  rendering user text as raw HTML instead of escaped text, or a vulnerable dependency, an
+  attacker's injected script can just do `localStorage.getItem("token")` and exfiltrate it, one
+  line, no special access needed. Once they have it, they can use it from their own machine,
+  indefinitely, until it naturally expires.
+- Using React or Angular narrows this risk a lot, both auto-escape `{value}`/`{{ value }}` by
+  default, which closes off the classic "forgot to escape user input" version of XSS. It doesn't
+  eliminate it though: `dangerouslySetInnerHTML` in React, `[innerHTML]` in Angular, and any
+  vulnerable third-party dependency all sit outside that automatic protection.
+
+**`HttpOnly` cookies (the security-recommended alternative):**
+
+- The token becomes literally unreadable by JavaScript, `document.cookie` won't show it, so the
+  one-line exfiltration above just doesn't work, even under the same XSS bug.
+- The cost: cookies get attached automatically by the browser to *any* request to that domain,
+  which is exactly the CSRF problem, so this reopens the CSRF protection I deliberately turned off
+  in `SecurityConfig`, needs `SameSite`, usually a second JS-readable CSRF cookie echoed back as a
+  header. It also needs real CORS configuration with credentials if frontend and backend are on
+  different origins, `localStorage`/headers don't care about that at all, cookies very much do.
+  And logout stops being free: frontend JS can't clear a cookie it can't read, so a real
+  `POST /auth/logout` endpoint becomes necessary, not just "the client forgets the token."
+
+**Where refresh tokens fit into this, since I confused myself on this for a while**: they solve a
+completely different problem than storage location does. `localStorage` alone already survives a
+page refresh, `localStorage` isn't cleared by reloading, only an in-memory JS variable is. What
+`localStorage` alone does *not* solve is the token's own 24-hour expiry, once that passes, the
+user is logged out regardless of storage, refresh or not. A refresh token is what lets the app
+silently get a new access token instead of forcing a real login again, that's a renewal problem,
+not a survival-across-reload problem, the two just happen to share the word "refresh."
+
+I'm not deciding this now, no frontend exists yet to actually test CORS/CSRF behavior against, and
+cookie-vs-header is exactly the kind of thing that's nearly impossible to verify meaningfully with
+a tool like Postman alone. Written up as its own GitHub issue for when there's a real frontend to
+build it against.
+
+### Left for later, on purpose
+
+No refresh tokens yet, so the one 24-hour access token is the whole session, no way to renew it
+silently, no real logout either (nothing server-side to revoke, since nothing server-side is kept
+at all right now). No cookie-based storage, still Bearer header only. Both written up properly as
+GitHub issues to revisit once there's an actual frontend to build and test either against.
+
+## What a unit test can and can't prove about `@Transactional`
 
 Wanted my test to prove that if the S3 delete fails, the database delete doesn't persist either
 (rollback). Learned that a plain Mockito unit test literally cannot show this: my test builds the
