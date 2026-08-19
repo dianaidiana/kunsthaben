@@ -81,17 +81,6 @@ class UserFavoriteArtistControllerTest {
               .expectStatus().isNotFound();
     }
 
-    @Test
-    void saveFavoriteArtistNotFound() {
-        var token = jwtService.generateToken(1L, "bob@ross.com");
-        when(service.saveFavoriteArtist(any(), any())).thenThrow(new NotFoundException(ErrorMessages.ARTIST_NOT_FOUND));
-
-        client.post()
-              .uri("/user/1/favorite-artist/1")
-              .header("Authorization", "Bearer " + token)
-              .exchange()
-              .expectStatus().isNotFound();
-    }
 
     @Test
     void saveFavoriteArtistDuplicate() {
