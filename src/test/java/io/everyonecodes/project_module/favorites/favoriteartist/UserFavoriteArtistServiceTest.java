@@ -2,9 +2,10 @@ package io.everyonecodes.project_module.favorites.favoriteartist;
 
 import io.everyonecodes.project_module.exceptions.BadRequestException;
 import io.everyonecodes.project_module.exceptions.ConflictException;
+import io.everyonecodes.project_module.exceptions.ErrorMessages;
 import io.everyonecodes.project_module.exceptions.NotFoundException;
 import io.everyonecodes.project_module.users.User;
-import io.everyonecodes.project_module.users.UserRepository;
+import io.everyonecodes.project_module.users.UserService;
 import io.everyonecodes.project_module.users.dto.UserResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -14,7 +15,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.OffsetDateTime;
 import java.util.List;
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -29,11 +29,11 @@ class UserFavoriteArtistServiceTest {
     UserFavoriteArtistRepository repository;
 
     @Mock
-    UserRepository userRepository;
+    UserService userService;
 
     @BeforeEach
     void setup() {
-        service = new UserFavoriteArtistService(repository, userRepository);
+        service = new UserFavoriteArtistService(repository, userService);
     }
 
     private final OffsetDateTime createdAt = OffsetDateTime.parse("2024-01-01T09:15:30Z");
@@ -46,8 +46,8 @@ class UserFavoriteArtistServiceTest {
 
     @Test
     void saveFavoriteArtistSuccessfully() {
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-        when(userRepository.findById(2L)).thenReturn(Optional.of(artist));
+        when(userService.fetchUser(1L)).thenReturn(user);
+        when(userService.fetchUser(2L)).thenReturn(artist);
         when(repository.existsByUserIdAndArtistId(1L, 2L)).thenReturn(false);
 
         var expectedResponse = new UserResponse(artist.getId(), artist.getName(), artist.getEmail(),
@@ -61,28 +61,28 @@ class UserFavoriteArtistServiceTest {
     @Test
     void saveFavoriteArtistSelfFollow() {
         assertThrows(BadRequestException.class, () -> service.saveFavoriteArtist(1L, 1L));
-        verifyNoInteractions(userRepository, repository);
+        verifyNoInteractions(userService, repository);
     }
 
     @Test
     void saveFavoriteArtistUserNotFound() {
-        when(userRepository.findById(1L)).thenReturn(Optional.empty());
+        when(userService.fetchUser(1L)).thenThrow(new NotFoundException(ErrorMessages.USER_NOT_FOUND));
 
         assertThrows(NotFoundException.class, () -> service.saveFavoriteArtist(1L, 2L));
     }
 
     @Test
     void saveFavoriteArtistArtistNotFound() {
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-        when(userRepository.findById(2L)).thenReturn(Optional.empty());
+        when(userService.fetchUser(1L)).thenReturn(user);
+        when(userService.fetchUser(2L)).thenThrow(new NotFoundException(ErrorMessages.USER_NOT_FOUND));
 
         assertThrows(NotFoundException.class, () -> service.saveFavoriteArtist(1L, 2L));
     }
 
     @Test
     void saveFavoriteArtistDuplicate() {
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-        when(userRepository.findById(2L)).thenReturn(Optional.of(artist));
+        when(userService.fetchUser(1L)).thenReturn(user);
+        when(userService.fetchUser(2L)).thenReturn(artist);
         when(repository.existsByUserIdAndArtistId(1L, 2L)).thenReturn(true);
 
         assertThrows(ConflictException.class, () -> service.saveFavoriteArtist(1L, 2L));

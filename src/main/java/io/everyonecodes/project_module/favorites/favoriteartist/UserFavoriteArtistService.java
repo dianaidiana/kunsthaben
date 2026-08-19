@@ -3,8 +3,7 @@ package io.everyonecodes.project_module.favorites.favoriteartist;
 import io.everyonecodes.project_module.exceptions.BadRequestException;
 import io.everyonecodes.project_module.exceptions.ConflictException;
 import io.everyonecodes.project_module.exceptions.ErrorMessages;
-import io.everyonecodes.project_module.exceptions.NotFoundException;
-import io.everyonecodes.project_module.users.UserRepository;
+import io.everyonecodes.project_module.users.UserService;
 import io.everyonecodes.project_module.users.dto.UserResponse;
 import org.springframework.stereotype.Service;
 
@@ -15,11 +14,11 @@ public class UserFavoriteArtistService {
 
     private final UserFavoriteArtistRepository repository;
 
-    private final UserRepository userRepository;
+    private final UserService userService;
 
-    public UserFavoriteArtistService(UserFavoriteArtistRepository repository, UserRepository userRepository) {
+    public UserFavoriteArtistService(UserFavoriteArtistRepository repository, UserService userService) {
         this.repository = repository;
-        this.userRepository = userRepository;
+        this.userService = userService;
     }
 
     public UserResponse saveFavoriteArtist(Long userId, Long artistId) {
@@ -27,10 +26,8 @@ public class UserFavoriteArtistService {
             throw new BadRequestException(ErrorMessages.SELF_FOLLOW);
         }
 
-        var user = userRepository.findById(userId)
-                                 .orElseThrow(() -> new NotFoundException(ErrorMessages.USER_NOT_FOUND));
-        var artist = userRepository.findById(artistId)
-                                   .orElseThrow(() -> new NotFoundException(ErrorMessages.ARTIST_NOT_FOUND));
+        var user = userService.fetchUser(userId);
+        var artist = userService.fetchUser(artistId);
 
         var followExists = repository.existsByUserIdAndArtistId(userId, artistId);
         if (followExists) {
