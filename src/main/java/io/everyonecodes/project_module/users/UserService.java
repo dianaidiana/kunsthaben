@@ -123,7 +123,7 @@ public class UserService {
         repository.delete(user);
     }
 
-    private User fetchUser(Long id) {
+    public User fetchUser(Long id) {
         return repository.findById(id)
                          .orElseThrow(() -> new NotFoundException(ErrorMessages.USER_NOT_FOUND));
     }
