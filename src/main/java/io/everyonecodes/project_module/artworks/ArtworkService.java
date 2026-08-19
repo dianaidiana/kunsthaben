@@ -9,15 +9,12 @@ import io.everyonecodes.project_module.artworks.dto.ArtworkDetailResponse;
 import io.everyonecodes.project_module.artworks.dto.ArtworkUpdateRequest;
 import io.everyonecodes.project_module.artworks.filters.ArtworkFilter;
 import io.everyonecodes.project_module.artworks.filters.ArtworkSpecifications;
-import io.everyonecodes.project_module.classification.category.Category;
-import io.everyonecodes.project_module.classification.category.CategoryRepository;
+import io.everyonecodes.project_module.classification.category.CategoryService;
 import io.everyonecodes.project_module.classification.media.Media;
-import io.everyonecodes.project_module.classification.media.MediaRepository;
+import io.everyonecodes.project_module.classification.media.MediaService;
 import io.everyonecodes.project_module.classification.support.Support;
-import io.everyonecodes.project_module.classification.support.SupportRepository;
-import io.everyonecodes.project_module.exceptions.ErrorMessages;
-import io.everyonecodes.project_module.exceptions.NotFoundException;
-import io.everyonecodes.project_module.users.UserRepository;
+import io.everyonecodes.project_module.classification.support.SupportService;
+import io.everyonecodes.project_module.users.UserService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -31,19 +28,19 @@ import java.util.Optional;
 public class ArtworkService {
 
     private final ArtworkRepository repository;
-    private final UserRepository userRepository;
-    private final CategoryRepository categoryRepository;
-    private final MediaRepository mediaRepository;
-    private final SupportRepository supportRepository;
+    private final UserService userService;
+    private final CategoryService categoryService;
+    private final MediaService mediaService;
+    private final SupportService supportService;
     private final ArtworkImageService artworkImageService;
     private final ArtworkOwnershipService artworkOwnershipService;
 
-    public ArtworkService(ArtworkRepository repository, UserRepository userRepository, CategoryRepository categoryRepository, MediaRepository mediaRepository, SupportRepository supportRepository, ArtworkImageService artworkImageService, ArtworkOwnershipService artworkOwnershipService) {
+    public ArtworkService(ArtworkRepository repository, UserService userService, CategoryService categoryService, MediaService mediaService, SupportService supportService, ArtworkImageService artworkImageService, ArtworkOwnershipService artworkOwnershipService) {
         this.repository = repository;
-        this.userRepository = userRepository;
-        this.categoryRepository = categoryRepository;
-        this.mediaRepository = mediaRepository;
-        this.supportRepository = supportRepository;
+        this.userService = userService;
+        this.categoryService = categoryService;
+        this.mediaService = mediaService;
+        this.supportService = supportService;
         this.artworkImageService = artworkImageService;
         this.artworkOwnershipService = artworkOwnershipService;
     }
@@ -79,9 +76,8 @@ public class ArtworkService {
     }
 
     public ArtworkDetailResponse create(Long artistId, ArtworkCreateRequest request) {
-        var artist = userRepository.findById(artistId)
-                                   .orElseThrow(() -> new NotFoundException(ErrorMessages.USER_NOT_FOUND));
-        var category = fetchCategory(request.getCategoryId());
+        var artist = userService.fetchUser(artistId);
+        var category = categoryService.fetchCategory(request.getCategoryId());
         var medium = fetchMedium(request.getMediumId());
         var support = fetchSupport(request.getSupportId());
         var dimensions = Dimensions.of(request.getWidth(), request.getHeight(), request.getDepth());
@@ -99,7 +95,7 @@ public class ArtworkService {
     @Transactional
     public ArtworkDetailResponse update(Long artistId, Long artworkId, ArtworkUpdateRequest request) {
         var artwork = artworkOwnershipService.fetchOwnedArtwork(artistId, artworkId);
-        var category = fetchCategory(request.getCategoryId());
+        var category = categoryService.fetchCategory(request.getCategoryId());
         var medium = fetchMedium(request.getMediumId());
         var support = fetchSupport(request.getSupportId());
         var dimensions = Dimensions.of(request.getWidth(), request.getHeight(), request.getDepth());
@@ -141,25 +137,18 @@ public class ArtworkService {
         return ArtworkDetailResponse.from(artwork);
     }
 
-    private Category fetchCategory(Long categoryId) {
-        return categoryRepository.findById(categoryId)
-                                 .orElseThrow(() -> new NotFoundException(ErrorMessages.CATEGORY_NOT_FOUND));
-    }
-
     private Media fetchMedium(Long mediumId) {
         if (mediumId == null) {
             return null;
         }
-        return mediaRepository.findById(mediumId)
-                              .orElseThrow(() -> new NotFoundException(ErrorMessages.MEDIA_NOT_FOUND));
+        return mediaService.fetchMedia(mediumId);
     }
 
     private Support fetchSupport(Long supportId) {
         if (supportId == null) {
             return null;
         }
-        return supportRepository.findById(supportId)
-                                .orElseThrow(() -> new NotFoundException(ErrorMessages.SUPPORT_NOT_FOUND));
+        return supportService.fetchSupport(supportId);
     }
 }
 

@@ -8,19 +8,19 @@ import io.everyonecodes.project_module.artworks.dto.ArtworkCreateRequest;
 import io.everyonecodes.project_module.artworks.dto.ArtworkDetailResponse;
 import io.everyonecodes.project_module.artworks.dto.ArtworkUpdateRequest;
 import io.everyonecodes.project_module.classification.category.Category;
-import io.everyonecodes.project_module.classification.category.CategoryRepository;
+import io.everyonecodes.project_module.classification.category.CategoryService;
 import io.everyonecodes.project_module.classification.enums.CategoryEnum;
 import io.everyonecodes.project_module.classification.enums.MediaEnum;
 import io.everyonecodes.project_module.classification.enums.SupportEnum;
 import io.everyonecodes.project_module.classification.media.Media;
-import io.everyonecodes.project_module.classification.media.MediaRepository;
+import io.everyonecodes.project_module.classification.media.MediaService;
 import io.everyonecodes.project_module.classification.support.Support;
-import io.everyonecodes.project_module.classification.support.SupportRepository;
+import io.everyonecodes.project_module.classification.support.SupportService;
 import io.everyonecodes.project_module.exceptions.ErrorMessages;
 import io.everyonecodes.project_module.exceptions.ForbiddenException;
 import io.everyonecodes.project_module.exceptions.NotFoundException;
 import io.everyonecodes.project_module.users.User;
-import io.everyonecodes.project_module.users.UserRepository;
+import io.everyonecodes.project_module.users.UserService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -48,16 +48,16 @@ class ArtworkServiceTest {
     ArtworkRepository repository;
 
     @Mock
-    UserRepository userRepository;
+    UserService userService;
 
     @Mock
-    CategoryRepository categoryRepository;
+    CategoryService categoryService;
 
     @Mock
-    MediaRepository mediaRepository;
+    MediaService mediaService;
 
     @Mock
-    SupportRepository supportRepository;
+    SupportService supportService;
 
     @Mock
     ArtworkImageService artworkImageService;
@@ -141,10 +141,10 @@ class ArtworkServiceTest {
     void setup() {
         service = new ArtworkService(
                 repository,
-                userRepository,
-                categoryRepository,
-                mediaRepository,
-                supportRepository,
+                userService,
+                categoryService,
+                mediaService,
+                supportService,
                 artworkImageService,
                 artworkOwnershipService
         );
@@ -231,10 +231,10 @@ class ArtworkServiceTest {
 
     @Test
     void createSuccessfully() {
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-        when(categoryRepository.findById(1L)).thenReturn(Optional.of(category));
-        when(mediaRepository.findById(1L)).thenReturn(Optional.of(media));
-        when(supportRepository.findById(1L)).thenReturn(Optional.of(support));
+        when(userService.fetchUser(1L)).thenReturn(user);
+        when(categoryService.fetchCategory(1L)).thenReturn(category);
+        when(mediaService.fetchMedia(1L)).thenReturn(media);
+        when(supportService.fetchSupport(1L)).thenReturn(support);
         when(repository.save(any())).thenAnswer(invocation -> {
             Artwork savedArtwork = invocation.getArgument(0);
             savedArtwork.setId(1L);
@@ -258,7 +258,7 @@ class ArtworkServiceTest {
 
     @Test
     void createWithUnexistentArtist() {
-        when(userRepository.findById(1L)).thenReturn(Optional.empty());
+        when(userService.fetchUser(1L)).thenThrow(new NotFoundException(ErrorMessages.USER_NOT_FOUND));
 
         assertThrows(NotFoundException.class, () -> service.create(1L, artworkCreateRequest));
         verify(repository, never()).save(any());
@@ -266,8 +266,8 @@ class ArtworkServiceTest {
 
     @Test
     void createWithUnexistentCategory() {
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-        when(categoryRepository.findById(1L)).thenReturn(Optional.empty());
+        when(userService.fetchUser(1L)).thenReturn(user);
+        when(categoryService.fetchCategory(1L)).thenThrow(new NotFoundException(ErrorMessages.CATEGORY_NOT_FOUND));
 
         assertThrows(NotFoundException.class, () -> service.create(1L, artworkCreateRequest));
         verify(repository, never()).save(any());
@@ -275,9 +275,9 @@ class ArtworkServiceTest {
 
     @Test
     void createWithUnexistentMedium() {
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-        when(categoryRepository.findById(1L)).thenReturn(Optional.of(category));
-        when(mediaRepository.findById(1L)).thenReturn(Optional.empty());
+        when(userService.fetchUser(1L)).thenReturn(user);
+        when(categoryService.fetchCategory(1L)).thenReturn(category);
+        when(mediaService.fetchMedia(1L)).thenThrow(new NotFoundException(ErrorMessages.MEDIA_NOT_FOUND));
 
         assertThrows(NotFoundException.class, () -> service.create(1L, artworkCreateRequest));
         verify(repository, never()).save(any());
@@ -285,10 +285,10 @@ class ArtworkServiceTest {
 
     @Test
     void createWithUnexistentSupport() {
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-        when(categoryRepository.findById(1L)).thenReturn(Optional.of(category));
-        when(mediaRepository.findById(1L)).thenReturn(Optional.of(media));
-        when(supportRepository.findById(1L)).thenReturn(Optional.empty());
+        when(userService.fetchUser(1L)).thenReturn(user);
+        when(categoryService.fetchCategory(1L)).thenReturn(category);
+        when(mediaService.fetchMedia(1L)).thenReturn(media);
+        when(supportService.fetchSupport(1L)).thenThrow(new NotFoundException(ErrorMessages.SUPPORT_NOT_FOUND));
 
         assertThrows(NotFoundException.class, () -> service.create(1L, artworkCreateRequest));
         verify(repository, never()).save(any());
@@ -297,9 +297,9 @@ class ArtworkServiceTest {
     @Test
     void updateExistentArtworkByOwner() {
         when(artworkOwnershipService.fetchOwnedArtwork(1L, 1L)).thenReturn(olderArtwork);
-        when(categoryRepository.findById(1L)).thenReturn(Optional.of(category));
-        when(mediaRepository.findById(1L)).thenReturn(Optional.of(media));
-        when(supportRepository.findById(1L)).thenReturn(Optional.of(support));
+        when(categoryService.fetchCategory(1L)).thenReturn(category);
+        when(mediaService.fetchMedia(1L)).thenReturn(media);
+        when(supportService.fetchSupport(1L)).thenReturn(support);
 
         var result = service.update(1L, 1L, artworkUpdateRequest);
 
@@ -338,7 +338,7 @@ class ArtworkServiceTest {
     @Test
     void updateWithUnexistentCategory() {
         when(artworkOwnershipService.fetchOwnedArtwork(1L, 1L)).thenReturn(olderArtwork);
-        when(categoryRepository.findById(1L)).thenReturn(Optional.empty());
+        when(categoryService.fetchCategory(1L)).thenThrow(new NotFoundException(ErrorMessages.CATEGORY_NOT_FOUND));
 
         assertThrows(NotFoundException.class, () -> service.update(1L, 1L, artworkUpdateRequest));
     }
@@ -346,8 +346,8 @@ class ArtworkServiceTest {
     @Test
     void updateWithUnexistentMedium() {
         when(artworkOwnershipService.fetchOwnedArtwork(1L, 1L)).thenReturn(olderArtwork);
-        when(categoryRepository.findById(1L)).thenReturn(Optional.of(category));
-        when(mediaRepository.findById(1L)).thenReturn(Optional.empty());
+        when(categoryService.fetchCategory(1L)).thenReturn(category);
+        when(mediaService.fetchMedia(1L)).thenThrow(new NotFoundException(ErrorMessages.MEDIA_NOT_FOUND));
 
         assertThrows(NotFoundException.class, () -> service.update(1L, 1L, artworkUpdateRequest));
     }
@@ -355,9 +355,9 @@ class ArtworkServiceTest {
     @Test
     void updateWithUnexistentSupport() {
         when(artworkOwnershipService.fetchOwnedArtwork(1L, 1L)).thenReturn(olderArtwork);
-        when(categoryRepository.findById(1L)).thenReturn(Optional.of(category));
-        when(mediaRepository.findById(1L)).thenReturn(Optional.of(media));
-        when(supportRepository.findById(1L)).thenReturn(Optional.empty());
+        when(categoryService.fetchCategory(1L)).thenReturn(category);
+        when(mediaService.fetchMedia(1L)).thenReturn(media);
+        when(supportService.fetchSupport(1L)).thenThrow(new NotFoundException(ErrorMessages.SUPPORT_NOT_FOUND));
 
         assertThrows(NotFoundException.class, () -> service.update(1L, 1L, artworkUpdateRequest));
     }
