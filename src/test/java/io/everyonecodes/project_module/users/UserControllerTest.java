@@ -1,6 +1,7 @@
 package io.everyonecodes.project_module.users;
 
 import io.everyonecodes.project_module.auth.AuthService;
+import io.everyonecodes.project_module.auth.JwtService;
 import io.everyonecodes.project_module.exceptions.ConflictException;
 import io.everyonecodes.project_module.exceptions.ErrorMessages;
 import io.everyonecodes.project_module.exceptions.NotFoundException;
@@ -40,6 +41,9 @@ public class UserControllerTest {
     @Autowired
     RestTestClient client;
 
+    @Autowired
+    JwtService jwtService;
+
     private final OffsetDateTime createdAt = OffsetDateTime.parse("2024-01-01T09:15:30Z");
 
     private final UserResponse expectedUser = new UserResponse(1L, "Bob Ross", "bob@ross.com",
@@ -63,14 +67,14 @@ public class UserControllerTest {
         when(authService.issueToken(1L, "bob@ross.com")).thenReturn("fake-token");
 
         UserRegisterResponse response = client.post()
-                                      .uri("/user/register")
-                                      .contentType(MediaType.APPLICATION_JSON)
-                                      .body(request)
-                                      .exchange()
-                                      .expectStatus().isCreated()
-                                      .expectBody(UserRegisterResponse.class)
-                                      .returnResult()
-                                      .getResponseBody();
+                                              .uri("/user/register")
+                                              .contentType(MediaType.APPLICATION_JSON)
+                                              .body(request)
+                                              .exchange()
+                                              .expectStatus().isCreated()
+                                              .expectBody(UserRegisterResponse.class)
+                                              .returnResult()
+                                              .getResponseBody();
         assertEquals(new UserRegisterResponse(expectedUser, "fake-token"), response);
     }
 
@@ -116,10 +120,12 @@ public class UserControllerTest {
         var request = new UserUpdateRequest("Bob Ross", "Vienna", "1020", "Updated bio");
         var expectedUserWithBio = new UserResponse(1L, "Bob Ross", "bob@ross.com",
                 null, null, "Vienna", "1020", "Updated bio", createdAt);
+        var token = jwtService.generateToken(1L, "bob@ross.com");
         when(service.update(eq(1L), any())).thenReturn(expectedUserWithBio);
 
         UserResponse response = client.put()
                                       .uri("/user/1")
+                                      .header("Authorization", "Bearer " + token)
                                       .contentType(MediaType.APPLICATION_JSON)
                                       .body(request)
                                       .exchange()
@@ -133,10 +139,12 @@ public class UserControllerTest {
     @Test
     void updateUnexistentUser() {
         var request = new UserUpdateRequest("Bob Ross", "Vienna", "1020", "Updated bio");
+        var token = jwtService.generateToken(1L, "bob@ross.com");
         when(service.update(eq(1L), any())).thenThrow(new NotFoundException(ErrorMessages.USER_NOT_FOUND));
 
         client.put()
               .uri("/user/1")
+              .header("Authorization", "Bearer " + token)
               .contentType(MediaType.APPLICATION_JSON)
               .body(request)
               .exchange()
@@ -144,14 +152,31 @@ public class UserControllerTest {
     }
 
     @Test
+    void updateNotOwnedProfile() {
+        var request = new UserUpdateRequest("Bob Ross", "Vienna", "1020", "Updated bio");
+        var token = jwtService.generateToken(2L, "bob@ross.com");
+        when(service.update(eq(1L), any())).thenThrow(new NotFoundException(ErrorMessages.USER_NOT_FOUND));
+
+        client.put()
+              .uri("/user/1")
+              .header("Authorization", "Bearer " + token)
+              .contentType(MediaType.APPLICATION_JSON)
+              .body(request)
+              .exchange()
+              .expectStatus().isForbidden();
+    }
+
+    @Test
     void updateAvatarSuccessfully() {
         addFilePart("avatar.jpg");
         var expectedUserWithAvatar = new UserResponse(1L, "Bob Ross", "bob@ross.com",
                 null, "https://bucket.s3.region.amazonaws.com/avatar.jpg", "Vienna", "1020", null, createdAt);
+        var token = jwtService.generateToken(1L, "bob@ross.com");
         when(service.updateAvatar(eq(1L), any())).thenReturn(expectedUserWithAvatar);
 
         UserResponse response = client.put()
                                       .uri("/user/1/avatar")
+                                      .header("Authorization", "Bearer " + token)
                                       .contentType(MediaType.MULTIPART_FORM_DATA)
                                       .body(builder.build())
                                       .exchange()
@@ -165,10 +190,12 @@ public class UserControllerTest {
     @Test
     void updateAvatarUnexistentUser() {
         addFilePart("avatar.jpg");
+        var token = jwtService.generateToken(1L, "bob@ross.com");
         when(service.updateAvatar(eq(1L), any())).thenThrow(new NotFoundException(ErrorMessages.USER_NOT_FOUND));
 
         client.put()
               .uri("/user/1/avatar")
+              .header("Authorization", "Bearer " + token)
               .contentType(MediaType.MULTIPART_FORM_DATA)
               .body(builder.build())
               .exchange()
@@ -176,14 +203,30 @@ public class UserControllerTest {
     }
 
     @Test
+    void updateAvatarNotOwnedProfile() {
+        addFilePart("avatar.jpg");
+        var token = jwtService.generateToken(2L, "bob@ross.com");
+
+        client.put()
+              .uri("/user/1/avatar")
+              .header("Authorization", "Bearer " + token)
+              .contentType(MediaType.MULTIPART_FORM_DATA)
+              .body(builder.build())
+              .exchange()
+              .expectStatus().isForbidden();
+    }
+
+    @Test
     void updateBannerSuccessfully() {
         addFilePart("banner.jpg");
         var expectedUserWithBanner = new UserResponse(1L, "Bob Ross", "bob@ross.com",
                 "https://bucket.s3.region.amazonaws.com/banner.jpg", null, "Vienna", "1020", null, createdAt);
+        var token = jwtService.generateToken(1L, "bob@ross.com");
         when(service.updateBanner(eq(1L), any())).thenReturn(expectedUserWithBanner);
 
         UserResponse response = client.put()
                                       .uri("/user/1/banner")
+                                      .header("Authorization", "Bearer " + token)
                                       .contentType(MediaType.MULTIPART_FORM_DATA)
                                       .body(builder.build())
                                       .exchange()
@@ -197,10 +240,12 @@ public class UserControllerTest {
     @Test
     void updateBannerUnexistentUser() {
         addFilePart("banner.jpg");
+        var token = jwtService.generateToken(1L, "bob@ross.com");
         when(service.updateBanner(eq(1L), any())).thenThrow(new NotFoundException(ErrorMessages.USER_NOT_FOUND));
 
         client.put()
               .uri("/user/1/banner")
+              .header("Authorization", "Bearer " + token)
               .contentType(MediaType.MULTIPART_FORM_DATA)
               .body(builder.build())
               .exchange()
@@ -208,9 +253,26 @@ public class UserControllerTest {
     }
 
     @Test
+    void updateBannerNotOwnedProfile() {
+        addFilePart("banner.jpg");
+        var token = jwtService.generateToken(2L, "bob@ross.com");
+
+        client.put()
+              .uri("/user/1/banner")
+              .header("Authorization", "Bearer " + token)
+              .contentType(MediaType.MULTIPART_FORM_DATA)
+              .body(builder.build())
+              .exchange()
+              .expectStatus().isForbidden();
+    }
+
+    @Test
     void deleteAvatarSuccessfully() {
+        var token = jwtService.generateToken(1L, "bob@ross.com");
+
         client.delete()
               .uri("/user/1/avatar")
+              .header("Authorization", "Bearer " + token)
               .exchange()
               .expectStatus().isNoContent();
 
@@ -219,19 +281,35 @@ public class UserControllerTest {
 
     @Test
     void deleteAvatarUnexistentUser() {
+        var token = jwtService.generateToken(1L, "bob@ross.com");
         org.mockito.Mockito.doThrow(new NotFoundException(ErrorMessages.USER_NOT_FOUND))
                            .when(service).deleteAvatar(1L);
 
         client.delete()
               .uri("/user/1/avatar")
+              .header("Authorization", "Bearer " + token)
               .exchange()
               .expectStatus().isNotFound();
     }
 
     @Test
+    void deleteAvatarNotOwnedProfile() {
+        var token = jwtService.generateToken(2L, "bob@ross.com");
+
+        client.delete()
+              .uri("/user/1/avatar")
+              .header("Authorization", "Bearer " + token)
+              .exchange()
+              .expectStatus().isForbidden();
+    }
+
+    @Test
     void deleteBannerSuccessfully() {
+        var token = jwtService.generateToken(1L, "bob@ross.com");
+
         client.delete()
               .uri("/user/1/banner")
+              .header("Authorization", "Bearer " + token)
               .exchange()
               .expectStatus().isNoContent();
 
@@ -240,19 +318,35 @@ public class UserControllerTest {
 
     @Test
     void deleteBannerUnexistentUser() {
+        var token = jwtService.generateToken(1L, "bob@ross.com");
         org.mockito.Mockito.doThrow(new NotFoundException(ErrorMessages.USER_NOT_FOUND))
                            .when(service).deleteBanner(1L);
 
         client.delete()
               .uri("/user/1/banner")
+              .header("Authorization", "Bearer " + token)
               .exchange()
               .expectStatus().isNotFound();
     }
 
     @Test
+    void deleteBannerNotOwnedProfile() {
+        var token = jwtService.generateToken(2L, "bob@ross.com");
+
+        client.delete()
+              .uri("/user/1/banner")
+              .header("Authorization", "Bearer " + token)
+              .exchange()
+              .expectStatus().isForbidden();
+    }
+
+    @Test
     void deleteSuccessfully() {
+        var token = jwtService.generateToken(1L, "bob@ross.com");
+
         client.delete()
               .uri("/user/1")
+              .header("Authorization", "Bearer " + token)
               .exchange()
               .expectStatus().isNoContent();
 
@@ -261,13 +355,26 @@ public class UserControllerTest {
 
     @Test
     void deleteUnexistentUser() {
+        var token = jwtService.generateToken(1L, "bob@ross.com");
         org.mockito.Mockito.doThrow(new NotFoundException(ErrorMessages.USER_NOT_FOUND))
                            .when(service).delete(1L);
 
         client.delete()
               .uri("/user/1")
+              .header("Authorization", "Bearer " + token)
               .exchange()
               .expectStatus().isNotFound();
+    }
+
+    @Test
+    void deleteNotOwnedProfile() {
+        var token = jwtService.generateToken(2L, "bob@ross.com");
+
+        client.delete()
+              .uri("/user/1")
+              .header("Authorization", "Bearer " + token)
+              .exchange()
+              .expectStatus().isForbidden();
     }
 
 }
