@@ -27,8 +27,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.SliceImpl;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -172,7 +172,7 @@ class ArtworkServiceTest {
     @Test
     void getAllCardsReturnsNonDeletedNewestFirst() {
         when(repository.findAllByDeletedAtIsNullAndSold(eq(false), any()))
-                .thenReturn(new PageImpl<>(List.of(newerArtwork, olderArtwork)));
+                .thenReturn(new SliceImpl<>(List.of(newerArtwork, olderArtwork)));
         var result = service.getAllCards(PageRequest.of(0, 20));
 
         assertEquals(List.of(newerArtworkCardResponse, olderArtworkCardResponse), result.getContent());
@@ -181,7 +181,7 @@ class ArtworkServiceTest {
     @Test
     void getAllCardsWhenNoneExist() {
         when(repository.findAllByDeletedAtIsNullAndSold(eq(false), any()))
-                .thenReturn(new PageImpl<>(List.of()));
+                .thenReturn(new SliceImpl<>(List.of()));
         var result = service.getAllCards(PageRequest.of(0, 20));
 
         assertTrue(result.getContent().isEmpty());
@@ -190,7 +190,7 @@ class ArtworkServiceTest {
     @Test
     void getUnsoldCardsByArtistIdReturnsNewestFirst() {
         when(repository.findAllByArtistIdAndDeletedAtIsNullAndSold(eq(1L), eq(false), any()))
-                .thenReturn(new PageImpl<>(List.of(newerArtwork, olderArtwork)));
+                .thenReturn(new SliceImpl<>(List.of(newerArtwork, olderArtwork)));
         var result = service.getUnsoldCardsByArtistId(1L, PageRequest.of(0, 20));
 
         assertEquals(List.of(newerArtworkCardResponse, olderArtworkCardResponse), result.getContent());
@@ -199,7 +199,7 @@ class ArtworkServiceTest {
     @Test
     void getUnsoldCardsByArtistIdWhenArtistHasNone() {
         when(repository.findAllByArtistIdAndDeletedAtIsNullAndSold(eq(1L), eq(false), any()))
-                .thenReturn(new PageImpl<>(List.of()));
+                .thenReturn(new SliceImpl<>(List.of()));
         var result = service.getUnsoldCardsByArtistId(1L, PageRequest.of(0, 20));
 
         assertTrue(result.getContent().isEmpty());
@@ -213,7 +213,7 @@ class ArtworkServiceTest {
         newerArtworkCardResponse.setSold(true);
 
         when(repository.findAllByArtistIdAndDeletedAtIsNullAndSold(eq(1L), eq(true), any()))
-                .thenReturn(new PageImpl<>(List.of(newerArtwork, olderArtwork)));
+                .thenReturn(new SliceImpl<>(List.of(newerArtwork, olderArtwork)));
 
         var result = service.getSoldCardsByArtistId(1L, PageRequest.of(0, 20));
 
@@ -223,7 +223,7 @@ class ArtworkServiceTest {
     @Test
     void getSoldCardsByArtistIdWhenArtistHasNoneSold() {
         when(repository.findAllByArtistIdAndDeletedAtIsNullAndSold(eq(1L), eq(true), any()))
-                .thenReturn(new PageImpl<>(List.of()));
+                .thenReturn(new SliceImpl<>(List.of()));
         var result = service.getSoldCardsByArtistId(1L, PageRequest.of(0, 20));
 
         assertTrue(result.getContent().isEmpty());

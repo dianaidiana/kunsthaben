@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureRestTestClient;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.SliceImpl;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.client.RestTestClient;
@@ -105,7 +105,7 @@ class ArtworkControllerTest {
 
     @Test
     void getAllCardsSuccessfully() {
-        when(service.getAllCards(any())).thenReturn(new PageImpl<>(List.of(expectedCard)));
+        when(service.getAllCards(any())).thenReturn(new SliceImpl<>(List.of(expectedCard)));
 
         client.get()
               .uri("/artwork")
@@ -117,7 +117,7 @@ class ArtworkControllerTest {
 
     @Test
     void searchSuccessfully() {
-        when(service.search(any(), any())).thenReturn(new PageImpl<>(List.of(expectedCard)));
+        when(service.search(any(), any())).thenReturn(new SliceImpl<>(List.of(expectedCard)));
 
         client.get()
               .uri("/artwork/search?keywords={keywords}", "happy accident")
@@ -129,7 +129,7 @@ class ArtworkControllerTest {
 
     @Test
     void getUnsoldCardsByArtistIdSuccessfully() {
-        when(service.getUnsoldCardsByArtistId(eq(1L), any())).thenReturn(new PageImpl<>(List.of(expectedCard)));
+        when(service.getUnsoldCardsByArtistId(eq(1L), any())).thenReturn(new SliceImpl<>(List.of(expectedCard)));
 
         client.get()
               .uri("/user/1/artwork")
@@ -141,7 +141,7 @@ class ArtworkControllerTest {
 
     @Test
     void getSoldCardsByArtistIdSuccessfully() {
-        when(service.getSoldCardsByArtistId(eq(1L), any())).thenReturn(new PageImpl<>(List.of(expectedCard)));
+        when(service.getSoldCardsByArtistId(eq(1L), any())).thenReturn(new SliceImpl<>(List.of(expectedCard)));
 
         client.get()
               .uri("/user/1/artwork/sold")
