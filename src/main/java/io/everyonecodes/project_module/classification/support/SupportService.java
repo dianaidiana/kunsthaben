@@ -1,5 +1,7 @@
 package io.everyonecodes.project_module.classification.support;
 
+import io.everyonecodes.project_module.exceptions.ErrorMessages;
+import io.everyonecodes.project_module.exceptions.NotFoundException;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -20,6 +22,11 @@ public class SupportService {
 
     public Optional<Support> findById(Long id) {
         return repository.findById(id);
+    }
+
+    public Support fetchSupport(Long id) {
+        return repository.findById(id)
+                         .orElseThrow(() -> new NotFoundException(ErrorMessages.SUPPORT_NOT_FOUND));
     }
 
     public Optional<Support> findByCode(String code) {
