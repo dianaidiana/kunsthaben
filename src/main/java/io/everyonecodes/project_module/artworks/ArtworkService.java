@@ -15,8 +15,8 @@ import io.everyonecodes.project_module.classification.media.MediaService;
 import io.everyonecodes.project_module.classification.support.Support;
 import io.everyonecodes.project_module.classification.support.SupportService;
 import io.everyonecodes.project_module.users.UserService;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -52,25 +52,25 @@ public class ArtworkService {
     }
 
     @Transactional(readOnly = true)
-    public Page<ArtworkCardResponse> getAllCards(Pageable pageable) {
+    public Slice<ArtworkCardResponse> getAllCards(Pageable pageable) {
         return repository.findAllByDeletedAtIsNullAndSold(false, pageable)
                          .map(ArtworkCardResponse::from);
     }
 
     @Transactional(readOnly = true)
-    public Page<ArtworkCardResponse> search(ArtworkFilter filter, Pageable pageable) {
-        return repository.findAll(ArtworkSpecifications.build(filter), pageable)
+    public Slice<ArtworkCardResponse> search(ArtworkFilter filter, Pageable pageable) {
+        return repository.findBy(ArtworkSpecifications.build(filter), query -> query.slice(pageable))
                          .map(ArtworkCardResponse::from);
     }
 
     @Transactional(readOnly = true)
-    public Page<ArtworkCardResponse> getUnsoldCardsByArtistId(Long artistId, Pageable pageable) {
+    public Slice<ArtworkCardResponse> getUnsoldCardsByArtistId(Long artistId, Pageable pageable) {
         return repository.findAllByArtistIdAndDeletedAtIsNullAndSold(artistId, false, pageable)
                          .map(ArtworkCardResponse::from);
     }
 
     @Transactional(readOnly = true)
-    public Page<ArtworkCardResponse> getSoldCardsByArtistId(Long artistId, Pageable pageable) {
+    public Slice<ArtworkCardResponse> getSoldCardsByArtistId(Long artistId, Pageable pageable) {
         return repository.findAllByArtistIdAndDeletedAtIsNullAndSold(artistId, true, pageable)
                          .map(ArtworkCardResponse::from);
     }
