@@ -13,6 +13,7 @@ public final class ErrorMessages {
     public static final String ARTWORK_NOT_FOUND = "Artwork not found";
 
     public static final String NOT_ARTWORK_OWNER = "You do not have permission to modify this artwork";
+    public static final String NOT_PROFILE_OWNER = "You do not have permission to modify this user's profile";
 
     public static final String TOO_MANY_IMAGES = "The number of images has reached a limit";
     public static final String IMAGES_DO_NOT_MATCH = "Can't reorder images as set of images don't match";
@@ -48,4 +49,5 @@ public final class ErrorMessages {
 
     public static final String INVALID_CREDENTIALS = "Invalid credentials";
     public static final String INVALID_TOKEN = "invalid token";
+
 }
