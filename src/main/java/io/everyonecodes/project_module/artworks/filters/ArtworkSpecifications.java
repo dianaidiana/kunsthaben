@@ -3,27 +3,13 @@ package io.everyonecodes.project_module.artworks.filters;
 import io.everyonecodes.project_module.artworks.Artwork;
 import org.springframework.data.jpa.domain.Specification;
 
-import java.util.Arrays;
 import java.util.List;
 
 public class ArtworkSpecifications {
 
-    public static Specification<Artwork> matchesKeywords(String keywords) {
-        if (keywords == null || keywords.isBlank()) {
-            return Specification.unrestricted();
-        }
-        return Arrays.stream(keywords.trim().split("\\s+"))
-                     .map(ArtworkSpecifications::matchesKeyword)
-                     .reduce(Specification::and)
-                     .orElse(Specification.unrestricted());
-    }
-
-    private static Specification<Artwork> matchesKeyword(String word) {
-        var pattern = "%" + word.toLowerCase() + "%";
-        return (root, query, cb) -> cb.or(
-                cb.like(cb.lower(root.get("title")), pattern),
-                cb.like(cb.lower(root.get("description")), pattern)
-        );
+    public static Specification<Artwork> hasIdIn(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) return Specification.unrestricted();
+        return (root, query, cb) -> root.get("id").in(ids);
     }
 
     public static Specification<Artwork> hasMinPrice(Double minPrice) {
@@ -170,7 +156,6 @@ public class ArtworkSpecifications {
         return Specification
                 .where(isNotDeleted())
                 .and(isNotSold())
-                .and(matchesKeywords(filter.getKeywords()))
                 .and(hasMinPrice(filter.getMinPrice()))
                 .and(hasMaxPrice(filter.getMaxPrice()))
                 .and(hasCityIn(filter.getCities()))
