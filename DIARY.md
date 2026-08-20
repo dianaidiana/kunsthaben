@@ -1,5 +1,410 @@
 # Diary of my project (or what I've learnt today):
 
+## 21.08 Full-text search, take two: the plain native-SQL branch, and what it costs to skip the stored column
+
+This is the second branch mentioned at the end of the entry below,
+`#11/enhancement-implement-tsvector-sql-native-way`. Same feature, same `search_vector` column and
+GIN index, but Hibernate never learns that `tsvector` exists this time. I wanted to see the actual
+difference with my own hands, not just take it on faith that one is "simpler."
+
+### The idea: keep search_vector out of Java entirely
+
+The Hibernate-way entry needed `hypersistence-utils` and a `FunctionContributor` for one reason:
+`Specification`/`CriteriaBuilder` had to be able to reference `search_vector` and call `@@` on it,
+because `ArtworkSpecifications.build(filter)` combines every filter, price, city, category, keyword,
+into a single query built through the Criteria API. If `search_vector` never has to appear inside a
+`Specification`, none of that machinery is needed.
+
+So instead, the keyword filter runs as its own tiny native query first, returning just the matching
+ids:
+
+```java
+@Query(value = "SELECT id FROM artwork WHERE search_vector @@ websearch_to_tsquery('english', :keywords)",
+        nativeQuery = true)
+List<Long> findIdsMatchingKeywords(@Param("keywords") String keywords);
+```
+
+and those ids get folded back into the existing filter chain as one more `Specification`, no
+different in kind from `hasCategoryIn` or `hasCityIn`:
+
+```java
+public static Specification<Artwork> hasIdIn(List<Long> ids) {
+    if (ids == null || ids.isEmpty()) return Specification.unrestricted();
+    return (root, query, cb) -> root.get("id").in(ids);
+}
+```
+
+`ArtworkService.search()` runs the keyword lookup first, only when keywords were actually sent, and
+short-circuits to an empty result without touching the main query at all if nothing matched:
+
+```java
+var specification = ArtworkSpecifications.build(filter);
+
+var keywords = filter.getKeywords();
+if (keywords != null && !keywords.isBlank()) {
+    var matchingIds = repository.findIdsMatchingKeywords(keywords);
+    if (matchingIds.isEmpty()) {
+        return new SliceImpl<>(List.of(), pageable, false);
+    }
+    specification = specification.and(ArtworkSpecifications.hasIdIn(matchingIds));
+}
+
+return repository.findBy(specification, query -> query.slice(pageable))
+                 .map(ArtworkCardResponse::from);
+```
+
+The column and its GIN index are exactly the same two lines as the Hibernate branch, still raw SQL
+in `fulltext-search.sql`, since there is still no annotation for "make this a GIN index" either way:
+
+```sql
+ALTER TABLE artwork
+    ADD COLUMN search_vector tsvector
+    GENERATED ALWAYS AS (to_tsvector('english', coalesce(title, '') || ' ' || coalesce(description, ''))) STORED;
+
+CREATE INDEX idx_artwork_search_vector ON artwork USING GIN (search_vector);
+```
+
+The difference is entirely on the Java side. `Artwork.java` never gets a `searchVector` field.
+Nothing in this branch imports `hypersistence-utils`, and there is no
+`META-INF/services/org.hibernate.boot.model.FunctionContributor` file at all. As far as Hibernate is
+concerned, `search_vector` is a column it has simply never heard of, which is fine, since nothing
+ever asks it to.
+
+### Comparing the two, now that I've actually built both
+
+**What the native-SQL branch drops entirely:** the `hypersistence-utils` dependency, the
+`@Type(PostgreSQLTSVectorType.class)` annotation (and the six broken constructor call sites that
+came with adding a field to `Artwork`), and the whole `FunctionContributor`/`ServiceLoader` detour.
+That is genuinely less to know and less to maintain, three separate pieces of Hibernate-specific
+machinery gone, for one filter.
+
+**What it costs instead:** a second query. When `keywords` is present, this branch always makes two
+round trips to Postgres, one to fetch matching ids, one for the actual filtered, paginated query.
+The Hibernate branch does it in a single query, because `search_vector` and `@@` can sit right
+inside the same `Specification` as every other filter. For a handful of keyword matches this is
+nothing. If a common word ever matched thousands of rows, the `id IN (...)` list on the second query
+would get large and clumsy, at which point the single-query version stops being just "nicer" and
+starts being the one that actually scales.
+
+**Where I was wrong to assume the native version is automatically "safer":** it isn't, not in the
+type-safety sense. `cb.function("ts_match", ...)` in the Hibernate branch is already just as
+stringly-typed as `@Query(value = "...", nativeQuery = true)` here, Java's compiler checks neither
+of them against the real database schema. Neither branch would catch a typo in a column name before
+runtime. The real advantage of the native branch isn't type safety, it's fewer moving parts standing
+between me and the SQL I actually want to run.
+
+**Where I think this leaves it:** the Hibernate branch is the "proper" pattern for a codebase that
+leans on `Specification` everywhere and wants every filter, keyword included, to compose the same
+way. The native branch is closer to what I would reach for on a smaller project, or for a filter that
+genuinely does not need to interact with the rest of the query. Given how small this project's team
+is (me), and that the keyword filter is the only one that needed anything Postgres-specific in the
+first place, I'm leaning toward keeping the native branch, but I want to sit with both a bit longer
+before deciding which one merges.
+
+### The question I keep circling back to: did I even need the column?
+
+Both branches store `search_vector` as a real column. I asked myself afterward whether that was
+necessary at all, since `to_tsvector(...)` can just as well be computed inside the query itself,
+with no column and no `ALTER TABLE`:
+
+```sql
+CREATE INDEX idx_artwork_search ON artwork
+    USING GIN (to_tsvector('english', coalesce(title, '') || ' ' || coalesce(description, '')));
+```
+
+```java
+@Query(value = """
+        SELECT id FROM artwork
+        WHERE to_tsvector('english', coalesce(title,'') || ' ' || coalesce(description,''))
+              @@ websearch_to_tsquery('english', :keywords)
+        """, nativeQuery = true)
+List<Long> findIdsMatchingKeywords(@Param("keywords") String keywords);
+```
+
+This is called an expression index, Postgres can index the result of a function call, not just a
+plain column, and it would have worked, with no `ALTER TABLE` at all. So why didn't I do it that
+way?
+
+The catch is not really about raw speed at read time. A GIN index, whether it sits on a stored
+column or on an expression, still holds the same precomputed lexeme entries either way, so a search
+that actually uses the index costs about the same in both versions. The catch is that Postgres will
+only use an expression index when the query's expression matches the indexed expression exactly,
+same function, same arguments, same literal text. My index is built on
+`to_tsvector('english', coalesce(title,'') || ' ' || coalesce(description,''))`. If I ever edit the
+query in `ArtworkRepository` and phrase that expression even slightly differently, an extra space
+that survives formatting, a different `coalesce` order, Postgres will not recognize it as the same
+expression, quietly stop using the index, and fall back to computing `to_tsvector` for every single
+row in the table, on every search. No error, no warning, just a query that got much slower one day
+for no obvious reason.
+
+A stored column removes that failure mode by construction. The query says `search_vector @@ ...`,
+a plain column reference, so there is no expression left to accidentally mismatch. That is also
+exactly what the Postgres manual itself recommends as the default approach for this reason, not
+because computing `to_tsvector` on the fly is dramatically expensive by itself, but because tying
+correctness to two pieces of text staying identical across two different files is a fragile thing to
+depend on long-term. The stored column costs a small amount of extra disk space, roughly the size of
+the tokenized text per row, and Postgres already has to recompute the vector on every insert or
+update either way, generated column or expression index, that part is not actually different between
+the two. What is different is how much has to go right at query time for the index to actually get
+used. I'm keeping the stored column in both branches for that reason.
+
+### Gotcha: a ghost of the other branch, in `target/`, not in the code
+
+First time I actually ran this branch, startup failed before it even got to opening a database
+connection:
+
+```
+Caused by: java.util.ServiceConfigurationError: org.hibernate.boot.model.FunctionContributor:
+Provider io.everyonecodes.project_module.artworks.filters.TsMatchFunctionContributor not found
+```
+
+`TsMatchFunctionContributor` is the class from the Hibernate branch, the one this branch
+deliberately does not have. `grep`-ing `src/` for it found nothing, which was confusing for a
+minute, until I checked `target/classes` instead of `src`:
+
+```
+target/classes/META-INF/services/org.hibernate.boot.model.FunctionContributor
+```
+
+still sitting there, still containing that one line pointing at the Hibernate branch's class. The
+explanation: `target/classes` is Maven's build output, a copy of `src/main/resources` plus compiled
+`.class` files. A normal `mvn compile` only adds or updates files in `target/`, it never deletes a
+file whose source disappeared, whether that disappearance was from switching branches or from me
+removing something myself. So this file survived from an earlier point where it, or something like
+it, existed in `src/main/resources`, and Hibernate's own `ServiceLoader` faithfully tried to load
+whatever that stale file pointed at, found nothing on the classpath by that name, and failed loudly.
+
+Fix was `./mvnw clean compile`, `clean` deletes `target/` entirely before rebuilding, so nothing
+stale can survive it. Worth remembering as a general rule, not just for this one file: if a startup
+error names a class or resource I am confident I already removed, that is a `target/` hygiene
+problem before it is a code problem, and `mvn clean` (or an IDE "rebuild project") is the first thing
+to reach for, before spending time re-reading code that is not actually the cause.
+
+### What's still missing, on purpose
+
+Same as the Hibernate branch: no automated test yet for either version of `search()`'s keyword
+filter, and I have not run this branch's version against a live Postgres instance myself, only
+compiled it and read the generated SQL carefully. That is next, before I decide which branch to
+keep.
+
+## 21.08 Real Postgres full-text search: tsvector, generated columns, and teaching Hibernate a new operator
+
+Back on 06.08 I wrote that my keyword search (`matchesKeyword`, splitting on whitespace and
+ANDing a `LIKE '%word%'` per word) "is not ideal" and that I would like to use Postgres's real text
+search types, `tsvector`/`tsquery`, instead, "leaving it for later." Today was later. This entry is
+the Hibernate-native way of doing it, on branch `#11/enhancement-implement-tsvector-hibernate-way`.
+There's a second branch, `#11/enhancement-implement-tsvector-sql-native-way`, where I'm trying the
+same feature with a plain native `@Query` instead, on purpose, to actually feel the tradeoff rather
+than just read about it. That one gets its own entry once it's done.
+
+### Why `LIKE` was never going to be good enough
+
+`LIKE '%painting%'` is a literal substring match. It has no idea that "painting" and "painted"
+share a root, and no idea that "a beautiful painting of Vienna" should rank differently from "the
+word painting appears here once." Postgres's text search type, `tsvector`, solves the first
+problem: it reduces words to their linguistic root (a "lexeme") before storing them, so `paint`,
+`painting` and `painted` all become the same token internally. `tsquery` is the same idea applied
+to the search phrase itself. `@@` is the operator that checks whether a `tsvector` matches a
+`tsquery`. None of this is Hibernate. All of it is plain Postgres. My job today was entirely about
+getting Hibernate, which has no opinion about any of this out of the box, to cooperate.
+
+### Dependency: hypersistence-utils
+
+Hibernate has built-in translators for ordinary SQL types, numbers, text, dates, but `tsvector` is
+Postgres-specific, so there's nothing to translate it with by default. `hypersistence-utils` is a
+well-known library (actively maintained, checked its GitHub push history before trusting it) whose
+`PostgreSQLTSVectorType` class is exactly this: a translator that lets Hibernate read a `tsvector`
+column into a plain Java `String`.
+
+```xml
+<dependency>
+    <groupId>io.hypersistence</groupId>
+    <artifactId>hypersistence-utils-hibernate-73</artifactId>
+    <version>3.15.4</version>
+</dependency>
+```
+
+The `-73` in the artifact id targets Hibernate 7.3/7.4, which is what this project's Spring Boot
+version actually pulls in. Worth noting for myself later: I checked Maven Central directly instead
+of trusting the version number from whatever source I copied it from, and it turned out a newer
+patch, `3.15.5`, had been published the day before. I stuck with `3.15.4` anyway, since it is the
+version I had already tested against, but the habit of checking the real registry instead of
+copying a version blindly is the thing worth keeping.
+
+### The generated column on `Artwork`
+
+```java
+@Type(PostgreSQLTSVectorType.class)
+@Column(columnDefinition = "tsvector GENERATED ALWAYS AS " +
+        "(to_tsvector('english', coalesce(title, '') || ' ' || coalesce(description, ''))) STORED",
+        insertable = false, updatable = false)
+private String searchVector;
+```
+
+Four separate things happening here, and I had to slow down and take them one at a time the first
+time:
+
+- `@Type(PostgreSQLTSVectorType.class)` is `org.hibernate.annotations.Type`, not the
+  `jakarta.persistence` one, because plain JPA has no concept of a pluggable type translator like
+  this at all. It just tells Hibernate to hand this one field off to the library's read/write logic
+  instead of its normal string handling.
+- `columnDefinition` is not parsed by Hibernate. Whatever string I put there gets pasted, verbatim,
+  right after the column name in the `CREATE TABLE` statement Hibernate generates. That's how a
+  fully Postgres-specific `GENERATED ALWAYS AS (...) STORED` clause can live inside a Java
+  annotation at all.
+- `GENERATED ALWAYS AS (...) STORED` means Postgres itself computes and stores this column's value,
+  from `title` and `description`, on every insert or update. My code never sets it.
+- `insertable = false, updatable = false` tells Hibernate to never include this column in any
+  `INSERT`/`UPDATE` it builds. It has to be this way, since Postgres would reject a write to a
+  `GENERATED` column anyway, this just stops Hibernate from ever attempting one.
+
+### Bug: adding one field broke six unrelated call sites
+
+The moment I saved that field, the build broke, and not in the file I had just touched:
+
+```
+[ERROR] .../ArtworkService.java:[86,23] no suitable constructor found for Artwork(...)
+    constructor Artwork(Long,User,String,double,int,String,String,String,Dimensions,Frame,
+    Category,Media,Support,OffsetDateTime,OffsetDateTime,boolean,boolean,List,String) is not applicable
+      (actual and formal argument lists differ in length)
+```
+
+`Artwork` uses Lombok's `@AllArgsConstructor`, which generates one constructor parameter per field,
+in declaration order, with no exceptions for fields that already have a default value. Adding
+`searchVector` at the bottom of the class added an 19th parameter to that constructor. Six places
+in the codebase called `new Artwork(...)` positionally, one in `ArtworkService` and five spread
+across three test files, and every single one of them was now missing an argument.
+
+The fix was mechanical, one extra `null` at the end of each call:
+
+```java
+var artwork = new Artwork(null, artist, request.getTitle(), request.getPrice(), request.getYear(),
+        request.getDescription(), request.getCity(), request.getPostcode(), dimensions, frame,
+        category, medium, support, null, null, false, false, new ArrayList<>(), null);
+```
+
+Worth writing down why this `null` is safe rather than a landmine: because `searchVector` is
+`insertable = false`, Hibernate never puts it in the generated `INSERT` at all. That `null` argument
+only exists to satisfy Java's constructor signature, it is never sent to Postgres. Postgres computes
+the real value itself, from `title`/`description`, the instant the row lands.
+
+### The GIN index, and why it had to be raw SQL
+
+`@Table(indexes = @Index(...))` only lets JPA name columns for an index, there's no attribute for
+*which kind* of index. Left unspecified, Postgres defaults to a B-tree index, built for equality
+and ordering, which does nothing useful for `tsvector @@ tsquery` matching. That needs a GIN index
+specifically, and there's no annotation for that at all, so this one piece had to be plain SQL:
+
+```sql
+CREATE INDEX idx_artwork_search_vector ON artwork USING GIN (search_vector);
+```
+
+wired up via:
+
+```properties
+spring.jpa.properties.hibernate.hbm2ddl.import_files=fulltext-search.sql
+```
+
+The reason this specific mechanism, and not `data.sql` or my own `CommandLineRunner`
+(`DatabaseInitializer.initDatabase`, which already seeds categories/media/supports): `import_files`
+is guaranteed by Hibernate itself to run right after the schema it just generated, which matters
+because this `CREATE INDEX` references a column, `search_vector`, that only exists once
+`CREATE TABLE artwork` has already run. A `CommandLineRunner` bean would technically also run late
+enough, Spring wires the whole context, including JPA, before any `CommandLineRunner` fires, but
+that ordering isn't something that bean documents or was built for, it's just a fact about Spring's
+startup order I'd have to already know to trust it. I did consider putting the index creation
+inside `initDatabase` since it already existed and I understood it, but decided against mixing an
+index (schema) into a bean whose whole job is seeding rows (data). Also worth remembering for later:
+none of this, `ddl-auto=create-drop` plus an import script, is how a real production app manages
+schema changes, that's what a proper migration tool like Flyway does, versioned, tracked, run once.
+This whole setup is a local-dev/coursework convenience specifically because a migration tool is a
+separate topic I haven't gotten to yet.
+
+### Teaching Hibernate's Criteria API about `@@`
+
+`Specification`, which is what `ArtworkSpecifications` is built on, only knows the standard SQL
+operations `CriteriaBuilder` exposes, equals, greater-than, like, and so on. `@@` is a Postgres
+invention with no SQL-standard equivalent, so there is no `cb.matches(...)` method waiting for me.
+I had to register it myself, via a `FunctionContributor`:
+
+```java
+public class TsMatchFunctionContributor implements FunctionContributor {
+    @Override
+    public void contributeFunctions(FunctionContributions functionContributions) {
+        var booleanType = functionContributions.getTypeConfiguration()
+                                                .getBasicTypeRegistry()
+                                                .resolve(StandardBasicTypes.BOOLEAN);
+
+        functionContributions.getFunctionRegistry()
+                             .registerPattern("ts_match", "?1 @@ ?2", booleanType);
+    }
+}
+```
+
+`registerPattern` says: whenever Java calls a function named `ts_match` with two arguments, replace
+it with the literal SQL `?1 @@ ?2`. `ts_match` isn't a real Postgres function, it's a name I made up
+purely so Java has something to call, Hibernate rewrites it away completely by the time SQL reaches
+the database.
+
+The part that actually confused me for a bit: how does Hibernate even find this class? Not through
+Spring, since Hibernate builds its schema and function registry before Spring's bean container is
+fully wired. It uses Java's own `ServiceLoader` mechanism instead, which works purely by file
+naming convention, no annotations involved:
+
+```
+src/main/resources/META-INF/services/org.hibernate.boot.model.FunctionContributor
+```
+
+containing one line, the fully-qualified name of my class. The filename itself *is* the interface's
+fully-qualified name. `ServiceLoader` scans every file matching that pattern on the classpath at
+startup and instantiates whatever's listed inside.
+
+### Rewriting `matchesKeywords`
+
+```java
+public static Specification<Artwork> matchesKeywords(String keywords) {
+    if (keywords == null || keywords.isBlank()) {
+        return Specification.unrestricted();
+    }
+    return (root, query, cb) -> cb.isTrue(cb.function("ts_match", Boolean.class,
+            root.get("searchVector"),
+            cb.function("websearch_to_tsquery", String.class, cb.literal("english"), cb.literal(keywords))));
+}
+```
+
+The old per-word splitting and `Arrays.stream(...).reduce(Specification::and)` logic is gone
+entirely, Postgres already tokenizes text on its own, so I'm not reimplementing something it does
+better. `websearch_to_tsquery`, not `plainto_tsquery`, specifically because it understands quoted
+phrases and `-excluded` words the way people actually type into a search box, and it's a real
+built-in Postgres function, so unlike `@@` it needed no registration, `cb.function(name, type,
+args...)` can call any SQL function by name as long as I tell it the return type.
+
+### Proving it actually works, not just compiles
+
+Ran the app, registered a user, and created two artworks through the real API:
+
+- "Vienna Rooftops", description "A quiet cityscape of Vienna rooftops at dusk"
+- "Alpine Sunrise", description "A dramatic mountain landscape painted at sunrise"
+
+```
+GET /artwork/search?keywords=mountain   → only Alpine Sunrise
+GET /artwork/search?keywords=vienna     → only Vienna Rooftops
+GET /artwork/search?keywords=painting   → only Alpine Sunrise
+```
+
+That last one is the one I actually wanted to see with my own eyes: Alpine Sunrise's description
+contains "painted", not "painting", anywhere. `LIKE '%painting%'` would never have matched it, they
+are different substrings. The match happened because Postgres's stemming reduces both words to the
+same root, `paint`, before comparing. That's the entire reason today's work exists, in one HTTP
+response.
+
+### What's still missing, on purpose
+
+No automated test for any of this yet. A Mockito unit test can't cover it, there's no real
+`tsvector`/GIN index/stemming behavior to fake with a mock repository, this needs a genuine
+`@DataJpaTest` against a real Postgres instance. Left as a follow-up once I've also tried the native
+SQL version, so I can decide whether to test both approaches or just the one I keep.
+
 ## 20.08 Slice for the card endpoints, and FetchableFluentQuery for search()
 
 Follow-up to what I wrote on 06.08: back then I noted that `Page<T>` costs two queries, the actual
