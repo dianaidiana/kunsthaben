@@ -1,0 +1,5 @@
+ALTER TABLE artwork
+    ADD COLUMN search_vector tsvector
+    GENERATED ALWAYS AS (to_tsvector('english', coalesce(title, '') || ' ' || coalesce(description, ''))) STORED;
+
+CREATE INDEX idx_artwork_search_vector ON artwork USING GIN (search_vector);
