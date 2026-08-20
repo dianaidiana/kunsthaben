@@ -1,5 +1,105 @@
 # Diary of my project (or what I've learnt today):
 
+## 20.08 Slice for the card endpoints, and FetchableFluentQuery for search()
+
+Follow-up to what I wrote on 06.08: back then I noted that `Page<T>` costs two queries, the actual
+`SELECT ... LIMIT ... OFFSET ...` plus a separate `SELECT COUNT(*)` to compute `totalElements`, and
+that `Slice<T>` is the cheaper option if I don't need the totals. Today I actually made that swap
+on the four artwork-card endpoints (`getAllCards`, `search`, `getUnsoldCardsByArtistId`,
+`getSoldCardsByArtistId`), since the frontend for these is a masonry "load more" layout, not
+numbered pages, so nothing ever needed `totalElements` in the first place.
+
+### The direct changes:
+
+`getAllCards` and the two artist-scoped methods all go through repository methods I wrote myself:
+
+```java
+Slice<Artwork> findAllByDeletedAtIsNullAndSold(boolean sold, Pageable pageable);
+```
+
+These are Spring Data *derived query methods*, the SQL gets generated from the method name, so I'm
+free to declare whatever return type I want. Changing `Page<Artwork>` to `Slice<Artwork>` here was
+the entire fix, Spring Data on its own knows to skip the count and fetch one extra row instead, to
+work out `hasNext()`.
+
+### The not so direct changes:
+
+`search()` was different, and it took me a while to see why. It doesn't call a method I wrote, it
+calls `findAll(Specification, Pageable)` from `JpaSpecificationExecutor`, an interface that ships
+with Spring Data itself. I don't own that interface, so I can't just redeclare its return type, and
+that one method is hardcoded to always return `Page`. So the fix couldn't be "change a signature",
+it had to be a genuinely different way of running the query.
+
+### FetchableFluentQuery
+
+Spring Data JPA has a more general way to execute a query.
+
+```java
+<R> R findBy(Specification<Artwork> spec, Function<FetchableFluentQuery<Artwork>, R> queryFunction)
+```
+
+`findBy` builds an unexecuted query internally from my `Specification`, wraps it as a
+`FetchableFluentQuery<Artwork>`, and hands that object to my function. That object doesn't hold a
+result yet, it holds a bunch of terminal methods, each one both *shapes* and *runs* the query
+differently: `.all()` for a plain `List`, `.page(pageable)` for a `Page` (count query included),
+`.slice(pageable)` for a `Slice` (no count query), plus `.first()`, `.count()`, `.exists()`. My
+function calls exactly one of them, and whatever it returns is what comes back out of `findBy`.
+
+Old:
+
+```java
+public Page<ArtworkCardResponse> search(ArtworkFilter filter, Pageable pageable) {
+    return repository.findAll(ArtworkSpecifications.build(filter), pageable)
+                     .map(ArtworkCardResponse::from);
+}
+```
+
+New:
+
+```java
+public Slice<ArtworkCardResponse> search(ArtworkFilter filter, Pageable pageable) {
+    return repository.findBy(ArtworkSpecifications.build(filter), query -> query.slice(pageable))
+                     .map(ArtworkCardResponse::from);
+}
+```
+
+The `Specification` itself, `ArtworkSpecifications.build(filter)`, the whole `WHERE` clause with
+every optional filter, didn't need to change at all. Only how the paginated result gets fetched
+afterward did. `query -> query.slice(pageable)` is a
+`Function<FetchableFluentQuery<Artwork>, Slice<Artwork>>`: `query` is the fluent-query object
+`findBy` built for me, calling `.slice(pageable)` on it is what actually issues the SQL, one query,
+`pageSize + 1` rows, no count. `.map(ArtworkCardResponse::from)` afterward is unchanged from before,
+`Slice` has the same `.map()` that `Page` does.
+
+### Checking what the JSON actually looks like, instead of assuming
+
+I ran the app locally and hit `GET /artwork` for real rather than trust the description in the
+GitHub issue I was working from. `totalElements`/`totalPages` were gone, as expected, but there was
+also no field literally called `hasNext`:
+
+```json
+{
+  "content": [],
+  "empty": true,
+  "first": true,
+  "last": true,
+  "number": 0,
+  "numberOfElements": 0,
+  "pageable": {
+    "...": "..."
+  },
+  "size": 20,
+  "sort": {
+    "...": "..."
+  }
+}
+```
+
+Jackson only picked up `isLast()`, `isFirst()`, and `isEmpty()`, because those follow the ordinary
+JavaBean `is`/`get` getter convention. `hasNext()` doesn't, so it never became its own JSON key.
+Whichever frontend ends up consuming this needs to check `!last` to decide whether to load another
+page, not look for a `hasNext` field, since that field doesn't exist on the wire.
+
 ## 19.08 Authentication: Spring Security, JWT, and how all the pieces talk to each other
 
 This one took a few sessions to actually click, so I'm writing it down properly, end to end, while
