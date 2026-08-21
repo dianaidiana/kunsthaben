@@ -1,6 +1,5 @@
 package io.everyonecodes.project_module.auth;
 
-import io.everyonecodes.project_module.auth.dto.AuthResponse;
 import io.everyonecodes.project_module.auth.dto.LoginRequest;
 import io.everyonecodes.project_module.exceptions.UnauthorizedException;
 import io.everyonecodes.project_module.users.User;
@@ -48,7 +47,7 @@ class AuthServiceTest {
 
         var result = service.login(request);
 
-        assertEquals(new AuthResponse("fake-token"), result);
+        assertEquals("fake-token", result);
     }
 
     @Test
