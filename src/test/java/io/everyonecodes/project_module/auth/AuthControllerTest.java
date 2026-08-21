@@ -1,18 +1,19 @@
 package io.everyonecodes.project_module.auth;
 
-import io.everyonecodes.project_module.auth.dto.AuthResponse;
 import io.everyonecodes.project_module.auth.dto.LoginRequest;
 import io.everyonecodes.project_module.exceptions.ErrorMessages;
 import io.everyonecodes.project_module.exceptions.UnauthorizedException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureRestTestClient;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.client.RestTestClient;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import java.time.Duration;
+
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
@@ -26,22 +27,25 @@ public class AuthControllerTest {
     @Autowired
     RestTestClient client;
 
+    @Value("${app.auth.cookie-secure}")
+    boolean cookieSecure;
+
     @Test
     void loginSuccessfully() {
         var request = new LoginRequest("bob@ross.com", "password123");
-        var expectedResponse = new AuthResponse("fake-token");
-        when(authService.login(any())).thenReturn(expectedResponse);
+        when(authService.login(any())).thenReturn("fake-token");
 
-        AuthResponse response = client.post()
-                                      .uri("/auth/login")
-                                      .contentType(MediaType.APPLICATION_JSON)
-                                      .body(request)
-                                      .exchange()
-                                      .expectStatus().isOk()
-                                      .expectBody(AuthResponse.class)
-                                      .returnResult()
-                                      .getResponseBody();
-        assertEquals(expectedResponse, response);
+        client.post()
+              .uri("/auth/login")
+              .contentType(MediaType.APPLICATION_JSON)
+              .body(request)
+              .exchange()
+              .expectStatus().isNoContent()
+              .expectCookie().valueEquals("auth_token", "fake-token")
+              .expectCookie().httpOnly("auth_token", true)
+              .expectCookie().secure("auth_token", cookieSecure)
+              .expectCookie().sameSite("auth_token", "Lax")
+              .expectCookie().maxAge("auth_token", Duration.ofMillis(86400000));
     }
 
     @Test
@@ -54,7 +58,18 @@ public class AuthControllerTest {
               .contentType(MediaType.APPLICATION_JSON)
               .body(request)
               .exchange()
-              .expectStatus().isEqualTo(401);
+              .expectStatus().isEqualTo(401)
+              .expectCookie().doesNotExist("auth_token");
+    }
+
+    @Test
+    void logoutClearsCookie() {
+        client.post()
+              .uri("/auth/logout")
+              .exchange()
+              .expectStatus().isNoContent()
+              .expectCookie().valueEquals("auth_token", "")
+              .expectCookie().maxAge("auth_token", Duration.ZERO);
     }
 
 }
