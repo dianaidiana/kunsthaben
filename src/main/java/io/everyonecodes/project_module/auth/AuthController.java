@@ -27,4 +27,10 @@ public class AuthController {
         var token = authService.login(request);
         authCookieService.attachAuthCookie(response, token);
     }
+
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PostMapping("/auth/logout")
+    void logout(HttpServletResponse response) {
+        authCookieService.clearAuthCookie(response);
+    }
 }
