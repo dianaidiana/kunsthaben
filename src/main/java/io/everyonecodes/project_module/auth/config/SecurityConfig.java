@@ -48,6 +48,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                     .requestMatchers(HttpMethod.POST, "/user/register").permitAll()
                     .requestMatchers(HttpMethod.POST, "/auth/login").permitAll()
+                    .requestMatchers(HttpMethod.POST, "/auth/logout").permitAll()
                     .requestMatchers(HttpMethod.GET, "/artwork/**", "/user/*/artwork/**").permitAll()
                     .requestMatchers(HttpMethod.GET, "/user/{id}", "/category/**", "/media/**", "/support/**").permitAll()
                     .requestMatchers("/error").permitAll()
