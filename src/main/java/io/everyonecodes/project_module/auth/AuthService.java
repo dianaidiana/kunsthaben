@@ -23,7 +23,7 @@ public class AuthService {
         this.jwtService = jwtService;
     }
 
-    public AuthResponse login(LoginRequest request) {
+    public String login(LoginRequest request) {
         try {
             /*
             this single call is where CustomUserDetailsService and the PasswordEncoder bean get used
@@ -38,7 +38,7 @@ public class AuthService {
 
         var user = userRepository.findByEmail(request.getEmail())
                                  .orElseThrow(() -> new UnauthorizedException(ErrorMessages.INVALID_CREDENTIALS));
-        return new AuthResponse(jwtService.generateToken(user.getId(), user.getEmail()));
+        return jwtService.generateToken(user.getId(), user.getEmail());
     }
 
     public String issueToken(Long userId, String email) {
