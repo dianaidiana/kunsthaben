@@ -17,11 +17,13 @@ import io.everyonecodes.project_module.classification.support.SupportService;
 import io.everyonecodes.project_module.users.UserService;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
+import org.springframework.data.domain.SliceImpl;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -59,7 +61,18 @@ public class ArtworkService {
 
     @Transactional(readOnly = true)
     public Slice<ArtworkCardResponse> search(ArtworkFilter filter, Pageable pageable) {
-        return repository.findBy(ArtworkSpecifications.build(filter), query -> query.slice(pageable))
+        var specification = ArtworkSpecifications.build(filter);
+
+        var keywords = filter.getKeywords();
+        if (keywords != null && !keywords.isBlank()) {
+            var matchingIds = repository.findIdsMatchingKeywords(keywords);
+            if (matchingIds.isEmpty()) {
+                return new SliceImpl<>(List.of(), pageable, false);
+            }
+            specification = specification.and(ArtworkSpecifications.hasIdIn(matchingIds));
+        }
+
+        return repository.findBy(specification, query -> query.slice(pageable))
                          .map(ArtworkCardResponse::from);
     }
 
