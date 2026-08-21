@@ -6,7 +6,6 @@ import io.everyonecodes.project_module.exceptions.ConflictException;
 import io.everyonecodes.project_module.exceptions.ErrorMessages;
 import io.everyonecodes.project_module.exceptions.NotFoundException;
 import io.everyonecodes.project_module.users.dto.UserRegisterRequest;
-import io.everyonecodes.project_module.users.dto.UserRegisterResponse;
 import io.everyonecodes.project_module.users.dto.UserResponse;
 import io.everyonecodes.project_module.users.dto.UserUpdateRequest;
 import org.junit.jupiter.api.Test;
@@ -66,16 +65,17 @@ public class UserControllerTest {
         when(service.register(any())).thenReturn(expectedUser);
         when(authService.issueToken(1L, "bob@ross.com")).thenReturn("fake-token");
 
-        UserRegisterResponse response = client.post()
-                                              .uri("/user/register")
-                                              .contentType(MediaType.APPLICATION_JSON)
-                                              .body(request)
-                                              .exchange()
-                                              .expectStatus().isCreated()
-                                              .expectBody(UserRegisterResponse.class)
-                                              .returnResult()
-                                              .getResponseBody();
-        assertEquals(new UserRegisterResponse(expectedUser, "fake-token"), response);
+        UserResponse response = client.post()
+                                      .uri("/user/register")
+                                      .contentType(MediaType.APPLICATION_JSON)
+                                      .body(request)
+                                      .exchange()
+                                      .expectStatus().isCreated()
+                                      .expectCookie().valueEquals("auth_token", "fake-token")
+                                      .expectBody(UserResponse.class)
+                                      .returnResult()
+                                      .getResponseBody();
+        assertEquals(expectedUser, response);
     }
 
     @Test

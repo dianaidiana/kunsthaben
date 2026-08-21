@@ -1,14 +1,15 @@
 package io.everyonecodes.project_module.users;
 
+import io.everyonecodes.project_module.auth.AuthCookieService;
 import io.everyonecodes.project_module.auth.AuthPrincipal;
 import io.everyonecodes.project_module.auth.AuthService;
 import io.everyonecodes.project_module.exceptions.ErrorMessages;
 import io.everyonecodes.project_module.exceptions.ForbiddenException;
 import io.everyonecodes.project_module.exceptions.NotFoundException;
 import io.everyonecodes.project_module.users.dto.UserRegisterRequest;
-import io.everyonecodes.project_module.users.dto.UserRegisterResponse;
 import io.everyonecodes.project_module.users.dto.UserResponse;
 import io.everyonecodes.project_module.users.dto.UserUpdateRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -20,18 +21,21 @@ public class UserController {
 
     private final UserService userService;
     private final AuthService authService;
+    private final AuthCookieService authCookieService;
 
-    public UserController(UserService userService, AuthService authService) {
+    public UserController(UserService userService, AuthService authService, AuthCookieService authCookieService) {
         this.userService = userService;
         this.authService = authService;
+        this.authCookieService = authCookieService;
     }
 
     @ResponseStatus(HttpStatus.CREATED)
     @PostMapping("/user/register")
-    UserRegisterResponse register(@Valid @RequestBody UserRegisterRequest userRequest) {
+    UserResponse register(@Valid @RequestBody UserRegisterRequest userRequest, HttpServletResponse response) {
         var user = userService.register(userRequest);
         var token = authService.issueToken(user.getId(), user.getEmail());
-        return new UserRegisterResponse(user, token);
+        authCookieService.attachAuthCookie(response, token);
+        return user;
     }
 
     @GetMapping("/user/{id}")
