@@ -3,6 +3,8 @@ package io.everyonecodes.project_module.auth;
 import io.everyonecodes.project_module.auth.dto.LoginRequest;
 import io.everyonecodes.project_module.exceptions.ErrorMessages;
 import io.everyonecodes.project_module.exceptions.UnauthorizedException;
+import io.everyonecodes.project_module.testsupport.AuthTestSupport;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -27,25 +29,35 @@ public class AuthControllerTest {
     @Autowired
     RestTestClient client;
 
+    @Autowired
+    JwtService jwtService;
+
     @Value("${app.auth.cookie-secure}")
     boolean cookieSecure;
+
+    @Value("${app.auth.cookie-name}")
+    String cookieName;
+
+    AuthTestSupport auth;
+
+    @BeforeEach
+    void setUpAuth() {
+        auth = new AuthTestSupport(client, jwtService, cookieName);
+    }
 
     @Test
     void loginSuccessfully() {
         var request = new LoginRequest("bob@ross.com", "password123");
         when(authService.login(any())).thenReturn("fake-token");
 
-        client.post()
-              .uri("/auth/login")
-              .contentType(MediaType.APPLICATION_JSON)
-              .body(request)
-              .exchange()
-              .expectStatus().isNoContent()
-              .expectCookie().valueEquals("auth_token", "fake-token")
-              .expectCookie().httpOnly("auth_token", true)
-              .expectCookie().secure("auth_token", cookieSecure)
-              .expectCookie().sameSite("auth_token", "Lax")
-              .expectCookie().maxAge("auth_token", Duration.ofMillis(86400000));
+        auth.withCsrf(client.post().uri("/auth/login").contentType(MediaType.APPLICATION_JSON).body(request))
+            .exchange()
+            .expectStatus().isNoContent()
+            .expectCookie().valueEquals("auth_token", "fake-token")
+            .expectCookie().httpOnly("auth_token", true)
+            .expectCookie().secure("auth_token", cookieSecure)
+            .expectCookie().sameSite("auth_token", "Lax")
+            .expectCookie().maxAge("auth_token", Duration.ofMillis(86400000));
     }
 
     @Test
@@ -53,23 +65,19 @@ public class AuthControllerTest {
         var request = new LoginRequest("bob@ross.com", "wrongpassword");
         when(authService.login(any())).thenThrow(new UnauthorizedException(ErrorMessages.INVALID_CREDENTIALS));
 
-        client.post()
-              .uri("/auth/login")
-              .contentType(MediaType.APPLICATION_JSON)
-              .body(request)
-              .exchange()
-              .expectStatus().isEqualTo(401)
-              .expectCookie().doesNotExist("auth_token");
+        auth.withCsrf(client.post().uri("/auth/login").contentType(MediaType.APPLICATION_JSON).body(request))
+            .exchange()
+            .expectStatus().isEqualTo(401)
+            .expectCookie().doesNotExist("auth_token");
     }
 
     @Test
     void logoutClearsCookie() {
-        client.post()
-              .uri("/auth/logout")
-              .exchange()
-              .expectStatus().isNoContent()
-              .expectCookie().valueEquals("auth_token", "")
-              .expectCookie().maxAge("auth_token", Duration.ZERO);
+        auth.withCsrf(client.post().uri("/auth/logout"))
+            .exchange()
+            .expectStatus().isNoContent()
+            .expectCookie().valueEquals("auth_token", "")
+            .expectCookie().maxAge("auth_token", Duration.ZERO);
     }
 
 }

@@ -6,8 +6,11 @@ import io.everyonecodes.project_module.exceptions.BadRequestException;
 import io.everyonecodes.project_module.exceptions.ErrorMessages;
 import io.everyonecodes.project_module.exceptions.ForbiddenException;
 import io.everyonecodes.project_module.exceptions.NotFoundException;
+import io.everyonecodes.project_module.testsupport.AuthTestSupport;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureRestTestClient;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.core.io.ByteArrayResource;
@@ -40,6 +43,16 @@ class ArtworkImageControllerTest {
     @Autowired
     JwtService jwtService;
 
+    @Value("${app.auth.cookie-name}")
+    String cookieName;
+
+    AuthTestSupport auth;
+
+    @BeforeEach
+    void setUpAuth() {
+        auth = new AuthTestSupport(client, jwtService, cookieName);
+    }
+
     private final MultipartBodyBuilder builder = new MultipartBodyBuilder();
 
     private final ArtworkImage expectedImage = new ArtworkImage(2L, null, "https://bucket.s3.region.amazonaws.com/key.jpg", 1);
@@ -61,19 +74,16 @@ class ArtworkImageControllerTest {
                })
                .contentType(MediaType.IMAGE_JPEG);
 
-        var token = jwtService.generateToken(1L, "bob@ross.com");
         when(service.addImage(eq(1L), eq(1L), any())).thenReturn(expectedImage);
 
-        ArtworkImage response = client.post()
-                                      .uri("/user/1/artwork/1/images")
-                                      .header("Authorization", "Bearer " + token)
-                                      .contentType(MediaType.MULTIPART_FORM_DATA)
-                                      .body(builder.build())
-                                      .exchange()
-                                      .expectStatus().isCreated()
-                                      .expectBody(ArtworkImage.class)
-                                      .returnResult()
-                                      .getResponseBody();
+        ArtworkImage response = auth.authenticated(
+                client.post().uri("/user/1/artwork/1/images").contentType(MediaType.MULTIPART_FORM_DATA).body(builder.build()),
+                1L, "bob@ross.com")
+                .exchange()
+                .expectStatus().isCreated()
+                .expectBody(ArtworkImage.class)
+                .returnResult()
+                .getResponseBody();
 
         assertEquals(expectedImage, response);
     }
@@ -94,16 +104,13 @@ class ArtworkImageControllerTest {
             }
         });
 
-        var token = jwtService.generateToken(1L, "bob@ross.com");
         when(service.addImage(eq(1L), eq(1L), any())).thenThrow(new BadRequestException(ErrorMessages.INVALID_IMAGE_FILE));
 
-        client.post()
-              .uri("/user/1/artwork/1/images")
-              .header("Authorization", "Bearer " + token)
-              .contentType(MediaType.MULTIPART_FORM_DATA)
-              .body(builder.build())
-              .exchange()
-              .expectStatus().isBadRequest();
+        auth.authenticated(
+                client.post().uri("/user/1/artwork/1/images").contentType(MediaType.MULTIPART_FORM_DATA).body(builder.build()),
+                1L, "bob@ross.com")
+                .exchange()
+                .expectStatus().isBadRequest();
     }
 
     @Test
@@ -116,16 +123,13 @@ class ArtworkImageControllerTest {
                })
                .contentType(MediaType.IMAGE_JPEG);
 
-        var token = jwtService.generateToken(1L, "bob@ross.com");
         when(service.addImage(eq(1L), eq(1L), any())).thenThrow(new NotFoundException(ErrorMessages.ARTWORK_NOT_FOUND));
 
-        client.post()
-              .uri("/user/1/artwork/1/images")
-              .header("Authorization", "Bearer " + token)
-              .contentType(MediaType.MULTIPART_FORM_DATA)
-              .body(builder.build())
-              .exchange()
-              .expectStatus().isNotFound();
+        auth.authenticated(
+                client.post().uri("/user/1/artwork/1/images").contentType(MediaType.MULTIPART_FORM_DATA).body(builder.build()),
+                1L, "bob@ross.com")
+                .exchange()
+                .expectStatus().isNotFound();
     }
 
     @Test
@@ -138,16 +142,13 @@ class ArtworkImageControllerTest {
                })
                .contentType(MediaType.IMAGE_JPEG);
 
-        var token = jwtService.generateToken(1L, "bob@ross.com");
         when(service.addImage(eq(1L), eq(1L), any())).thenThrow(new ForbiddenException(ErrorMessages.NOT_ARTWORK_OWNER));
 
-        client.post()
-              .uri("/user/1/artwork/1/images")
-              .header("Authorization", "Bearer " + token)
-              .contentType(MediaType.MULTIPART_FORM_DATA)
-              .body(builder.build())
-              .exchange()
-              .expectStatus().isForbidden();
+        auth.authenticated(
+                client.post().uri("/user/1/artwork/1/images").contentType(MediaType.MULTIPART_FORM_DATA).body(builder.build()),
+                1L, "bob@ross.com")
+                .exchange()
+                .expectStatus().isForbidden();
     }
 
     @Test
@@ -160,15 +161,11 @@ class ArtworkImageControllerTest {
                })
                .contentType(MediaType.IMAGE_JPEG);
 
-        var token = jwtService.generateToken(2L, "someone-else@example.com");
-
-        client.post()
-              .uri("/user/1/artwork/1/images")
-              .header("Authorization", "Bearer " + token)
-              .contentType(MediaType.MULTIPART_FORM_DATA)
-              .body(builder.build())
-              .exchange()
-              .expectStatus().isForbidden();
+        auth.authenticated(
+                client.post().uri("/user/1/artwork/1/images").contentType(MediaType.MULTIPART_FORM_DATA).body(builder.build()),
+                2L, "someone-else@example.com")
+                .exchange()
+                .expectStatus().isForbidden();
     }
 
     @Test
@@ -181,133 +178,99 @@ class ArtworkImageControllerTest {
                })
                .contentType(MediaType.IMAGE_JPEG);
 
-        var token = jwtService.generateToken(1L, "bob@ross.com");
         when(service.addImage(eq(1L), eq(1L), any())).thenThrow(new BadRequestException(ErrorMessages.TOO_MANY_IMAGES));
 
-        client.post()
-              .uri("/user/1/artwork/1/images")
-              .header("Authorization", "Bearer " + token)
-              .contentType(MediaType.MULTIPART_FORM_DATA)
-              .body(builder.build())
-              .exchange()
-              .expectStatus().isBadRequest();
+        auth.authenticated(
+                client.post().uri("/user/1/artwork/1/images").contentType(MediaType.MULTIPART_FORM_DATA).body(builder.build()),
+                1L, "bob@ross.com")
+                .exchange()
+                .expectStatus().isBadRequest();
     }
 
     @Test
     void reorderImagesSuccessfully() {
-        var token = jwtService.generateToken(1L, "bob@ross.com");
-
-        client.put()
-              .uri("/user/1/artwork/1/images/reorder")
-              .header("Authorization", "Bearer " + token)
-              .contentType(MediaType.APPLICATION_JSON)
-              .body(List.of(2L, 1L))
-              .exchange()
-              .expectStatus().isNoContent();
+        auth.authenticated(
+                client.put().uri("/user/1/artwork/1/images/reorder").contentType(MediaType.APPLICATION_JSON).body(List.of(2L, 1L)),
+                1L, "bob@ross.com")
+                .exchange()
+                .expectStatus().isNoContent();
 
         verify(service).reorderImages(1L, 1L, List.of(2L, 1L));
     }
 
     @Test
     void reorderImagesNotOwnedArtwork() {
-        var token = jwtService.generateToken(1L, "bob@ross.com");
         doThrow(new ForbiddenException(ErrorMessages.NOT_ARTWORK_OWNER)).when(service).reorderImages(eq(1L), eq(1L), any());
 
-        client.put()
-              .uri("/user/1/artwork/1/images/reorder")
-              .header("Authorization", "Bearer " + token)
-              .contentType(MediaType.APPLICATION_JSON)
-              .body(List.of(1L))
-              .exchange()
-              .expectStatus().isForbidden();
+        auth.authenticated(
+                client.put().uri("/user/1/artwork/1/images/reorder").contentType(MediaType.APPLICATION_JSON).body(List.of(1L)),
+                1L, "bob@ross.com")
+                .exchange()
+                .expectStatus().isForbidden();
     }
 
     @Test
     void reorderImagesAsDifferentArtist() {
-        var token = jwtService.generateToken(2L, "someone-else@example.com");
-
-        client.put()
-              .uri("/user/1/artwork/1/images/reorder")
-              .header("Authorization", "Bearer " + token)
-              .contentType(MediaType.APPLICATION_JSON)
-              .body(List.of(1L))
-              .exchange()
-              .expectStatus().isForbidden();
+        auth.authenticated(
+                client.put().uri("/user/1/artwork/1/images/reorder").contentType(MediaType.APPLICATION_JSON).body(List.of(1L)),
+                2L, "someone-else@example.com")
+                .exchange()
+                .expectStatus().isForbidden();
     }
 
     @Test
     void reorderImagesUnexistentArtwork() {
-        var token = jwtService.generateToken(1L, "bob@ross.com");
         doThrow(new NotFoundException(ErrorMessages.ARTWORK_NOT_FOUND)).when(service).reorderImages(eq(1L), eq(1L), any());
 
-        client.put()
-              .uri("/user/1/artwork/1/images/reorder")
-              .header("Authorization", "Bearer " + token)
-              .contentType(MediaType.APPLICATION_JSON)
-              .body(List.of(1L))
-              .exchange()
-              .expectStatus().isNotFound();
+        auth.authenticated(
+                client.put().uri("/user/1/artwork/1/images/reorder").contentType(MediaType.APPLICATION_JSON).body(List.of(1L)),
+                1L, "bob@ross.com")
+                .exchange()
+                .expectStatus().isNotFound();
     }
 
     @Test
     void reorderImagesSetMismatch() {
-        var token = jwtService.generateToken(1L, "bob@ross.com");
         doThrow(new BadRequestException(ErrorMessages.IMAGES_DO_NOT_MATCH)).when(service).reorderImages(eq(1L), eq(1L), any());
 
-        client.put()
-              .uri("/user/1/artwork/1/images/reorder")
-              .header("Authorization", "Bearer " + token)
-              .contentType(MediaType.APPLICATION_JSON)
-              .body(List.of(1L, 3L))
-              .exchange()
-              .expectStatus().isBadRequest();
+        auth.authenticated(
+                client.put().uri("/user/1/artwork/1/images/reorder").contentType(MediaType.APPLICATION_JSON).body(List.of(1L, 3L)),
+                1L, "bob@ross.com")
+                .exchange()
+                .expectStatus().isBadRequest();
     }
 
     @Test
     void deleteImageSuccessfully() {
-        var token = jwtService.generateToken(1L, "bob@ross.com");
-
-        client.delete()
-              .uri("/user/1/artwork/1/images/1")
-              .header("Authorization", "Bearer " + token)
-              .exchange()
-              .expectStatus().isNoContent();
+        auth.authenticated(client.delete().uri("/user/1/artwork/1/images/1"), 1L, "bob@ross.com")
+            .exchange()
+            .expectStatus().isNoContent();
 
         verify(service).deleteImage(1L, 1L, 1L);
     }
 
     @Test
     void deleteImageFromNotOwnedArtwork() {
-        var token = jwtService.generateToken(1L, "bob@ross.com");
         doThrow(new ForbiddenException(ErrorMessages.NOT_ARTWORK_OWNER)).when(service).deleteImage(1L, 1L, 1L);
 
-        client.delete()
-              .uri("/user/1/artwork/1/images/1")
-              .header("Authorization", "Bearer " + token)
-              .exchange()
-              .expectStatus().isForbidden();
+        auth.authenticated(client.delete().uri("/user/1/artwork/1/images/1"), 1L, "bob@ross.com")
+            .exchange()
+            .expectStatus().isForbidden();
     }
 
     @Test
     void deleteImageAsDifferentArtist() {
-        var token = jwtService.generateToken(2L, "someone-else@example.com");
-
-        client.delete()
-              .uri("/user/1/artwork/1/images/1")
-              .header("Authorization", "Bearer " + token)
-              .exchange()
-              .expectStatus().isForbidden();
+        auth.authenticated(client.delete().uri("/user/1/artwork/1/images/1"), 2L, "someone-else@example.com")
+            .exchange()
+            .expectStatus().isForbidden();
     }
 
     @Test
     void deleteUnexistentImage() {
-        var token = jwtService.generateToken(1L, "bob@ross.com");
         doThrow(new NotFoundException(ErrorMessages.IMAGE_NOT_FOUND)).when(service).deleteImage(1L, 1L, 1L);
 
-        client.delete()
-              .uri("/user/1/artwork/1/images/1")
-              .header("Authorization", "Bearer " + token)
-              .exchange()
-              .expectStatus().isNotFound();
+        auth.authenticated(client.delete().uri("/user/1/artwork/1/images/1"), 1L, "bob@ross.com")
+            .exchange()
+            .expectStatus().isNotFound();
     }
 }

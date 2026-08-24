@@ -8,8 +8,11 @@ import io.everyonecodes.project_module.auth.JwtService;
 import io.everyonecodes.project_module.exceptions.ErrorMessages;
 import io.everyonecodes.project_module.exceptions.ForbiddenException;
 import io.everyonecodes.project_module.exceptions.NotFoundException;
+import io.everyonecodes.project_module.testsupport.AuthTestSupport;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureRestTestClient;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.SliceImpl;
@@ -40,6 +43,16 @@ class ArtworkControllerTest {
 
     @Autowired
     JwtService jwtService;
+
+    @Value("${app.auth.cookie-name}")
+    String cookieName;
+
+    AuthTestSupport auth;
+
+    @BeforeEach
+    void setUpAuth() {
+        auth = new AuthTestSupport(client, jwtService, cookieName);
+    }
 
     private final OffsetDateTime createdAt = OffsetDateTime.parse("2024-01-01T09:15:30Z");
 
@@ -153,185 +166,148 @@ class ArtworkControllerTest {
 
     @Test
     void createSuccessfully() {
-        var token = jwtService.generateToken(1L, "bob@ross.com");
         when(service.create(eq(1L), any())).thenReturn(expectedDetail);
 
-        ArtworkDetailResponse response = client.post()
-                                               .uri("/user/1/artwork")
-                                               .header("Authorization", "Bearer " + token)
-                                               .contentType(MediaType.APPLICATION_JSON)
-                                               .body(createRequest)
-                                               .exchange()
-                                               .expectStatus().isCreated()
-                                               .expectBody(ArtworkDetailResponse.class)
-                                               .returnResult()
-                                               .getResponseBody();
+        ArtworkDetailResponse response = auth.authenticated(
+                client.post().uri("/user/1/artwork").contentType(MediaType.APPLICATION_JSON).body(createRequest),
+                1L, "bob@ross.com")
+                .exchange()
+                .expectStatus().isCreated()
+                .expectBody(ArtworkDetailResponse.class)
+                .returnResult()
+                .getResponseBody();
 
         assertEquals(expectedDetail, response);
     }
 
     @Test
     void createWithUnexistentArtist() {
-        var token = jwtService.generateToken(1L, "bob@ross.com");
         when(service.create(eq(1L), any())).thenThrow(new NotFoundException(ErrorMessages.USER_NOT_FOUND));
 
-        client.post()
-              .uri("/user/1/artwork")
-              .header("Authorization", "Bearer " + token)
-              .contentType(MediaType.APPLICATION_JSON)
-              .body(createRequest)
-              .exchange()
-              .expectStatus().isNotFound();
+        auth.authenticated(
+                client.post().uri("/user/1/artwork").contentType(MediaType.APPLICATION_JSON).body(createRequest),
+                1L, "bob@ross.com")
+                .exchange()
+                .expectStatus().isNotFound();
     }
 
     @Test
     void createAsDifferentArtist() {
-        var token = jwtService.generateToken(2L, "someone-else@example.com");
-
-        client.post()
-              .uri("/user/1/artwork")
-              .header("Authorization", "Bearer " + token)
-              .contentType(MediaType.APPLICATION_JSON)
-              .body(createRequest)
-              .exchange()
-              .expectStatus().isForbidden();
+        auth.authenticated(
+                client.post().uri("/user/1/artwork").contentType(MediaType.APPLICATION_JSON).body(createRequest),
+                2L, "someone-else@example.com")
+                .exchange()
+                .expectStatus().isForbidden();
     }
 
     @Test
     void updateSuccessfully() {
-        var token = jwtService.generateToken(1L, "bob@ross.com");
         when(service.update(eq(1L), eq(1L), any())).thenReturn(expectedDetail);
 
-        ArtworkDetailResponse response = client.put()
-                                               .uri("/user/1/artwork/1")
-                                               .header("Authorization", "Bearer " + token)
-                                               .contentType(MediaType.APPLICATION_JSON)
-                                               .body(updateRequest)
-                                               .exchange()
-                                               .expectStatus().isOk()
-                                               .expectBody(ArtworkDetailResponse.class)
-                                               .returnResult()
-                                               .getResponseBody();
+        ArtworkDetailResponse response = auth.authenticated(
+                client.put().uri("/user/1/artwork/1").contentType(MediaType.APPLICATION_JSON).body(updateRequest),
+                1L, "bob@ross.com")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(ArtworkDetailResponse.class)
+                .returnResult()
+                .getResponseBody();
 
         assertEquals(expectedDetail, response);
     }
 
     @Test
     void updateArtworkNotOwnedByCaller() {
-        var token = jwtService.generateToken(1L, "bob@ross.com");
         when(service.update(eq(1L), eq(1L), any())).thenThrow(new ForbiddenException(ErrorMessages.NOT_ARTWORK_OWNER));
 
-        client.put()
-              .uri("/user/1/artwork/1")
-              .header("Authorization", "Bearer " + token)
-              .contentType(MediaType.APPLICATION_JSON)
-              .body(updateRequest)
-              .exchange()
-              .expectStatus().isForbidden();
+        auth.authenticated(
+                client.put().uri("/user/1/artwork/1").contentType(MediaType.APPLICATION_JSON).body(updateRequest),
+                1L, "bob@ross.com")
+                .exchange()
+                .expectStatus().isForbidden();
     }
 
     @Test
     void updateAsDifferentArtist() {
-        var token = jwtService.generateToken(2L, "someone-else@example.com");
-
-        client.put()
-              .uri("/user/1/artwork/1")
-              .header("Authorization", "Bearer " + token)
-              .contentType(MediaType.APPLICATION_JSON)
-              .body(updateRequest)
-              .exchange()
-              .expectStatus().isForbidden();
+        auth.authenticated(
+                client.put().uri("/user/1/artwork/1").contentType(MediaType.APPLICATION_JSON).body(updateRequest),
+                2L, "someone-else@example.com")
+                .exchange()
+                .expectStatus().isForbidden();
     }
 
     @Test
     void deleteSuccessfully() {
-        var token = jwtService.generateToken(1L, "bob@ross.com");
-
-        client.delete()
-              .uri("/user/1/artwork/1")
-              .header("Authorization", "Bearer " + token)
-              .exchange()
-              .expectStatus().isNoContent();
+        auth.authenticated(client.delete().uri("/user/1/artwork/1"), 1L, "bob@ross.com")
+            .exchange()
+            .expectStatus().isNoContent();
 
         verify(service).delete(1L, 1L);
     }
 
     @Test
     void deleteUnexistentArtwork() {
-        var token = jwtService.generateToken(1L, "bob@ross.com");
         doThrow(new NotFoundException(ErrorMessages.ARTWORK_NOT_FOUND)).when(service).delete(1L, 1L);
 
-        client.delete()
-              .uri("/user/1/artwork/1")
-              .header("Authorization", "Bearer " + token)
-              .exchange()
-              .expectStatus().isNotFound();
+        auth.authenticated(client.delete().uri("/user/1/artwork/1"), 1L, "bob@ross.com")
+            .exchange()
+            .expectStatus().isNotFound();
     }
 
     @Test
     void deleteAsDifferentArtist() {
-        var token = jwtService.generateToken(2L, "someone-else@example.com");
-
-        client.delete()
-              .uri("/user/1/artwork/1")
-              .header("Authorization", "Bearer " + token)
-              .exchange()
-              .expectStatus().isForbidden();
+        auth.authenticated(client.delete().uri("/user/1/artwork/1"), 2L, "someone-else@example.com")
+            .exchange()
+            .expectStatus().isForbidden();
     }
 
     @Test
     void markReservedSuccessfully() {
-        var token = jwtService.generateToken(1L, "bob@ross.com");
         when(service.markReserved(eq(1L), eq(1L), eq(true))).thenReturn(expectedDetail);
 
-        ArtworkDetailResponse response = client.patch()
-                                               .uri("/user/1/artwork/1/reserved?reserved={reserved}", true)
-                                               .header("Authorization", "Bearer " + token)
-                                               .exchange()
-                                               .expectStatus().isOk()
-                                               .expectBody(ArtworkDetailResponse.class)
-                                               .returnResult()
-                                               .getResponseBody();
+        ArtworkDetailResponse response = auth.authenticated(
+                client.patch().uri("/user/1/artwork/1/reserved?reserved={reserved}", true),
+                1L, "bob@ross.com")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(ArtworkDetailResponse.class)
+                .returnResult()
+                .getResponseBody();
 
         assertEquals(expectedDetail, response);
     }
 
     @Test
     void markReservedAsDifferentArtist() {
-        var token = jwtService.generateToken(2L, "someone-else@example.com");
-
-        client.patch()
-              .uri("/user/1/artwork/1/reserved?reserved={reserved}", true)
-              .header("Authorization", "Bearer " + token)
-              .exchange()
-              .expectStatus().isForbidden();
+        auth.authenticated(
+                client.patch().uri("/user/1/artwork/1/reserved?reserved={reserved}", true),
+                2L, "someone-else@example.com")
+                .exchange()
+                .expectStatus().isForbidden();
     }
 
     @Test
     void markSoldSuccessfully() {
-        var token = jwtService.generateToken(1L, "bob@ross.com");
         when(service.markSold(eq(1L), eq(1L), eq(true))).thenReturn(expectedDetail);
 
-        ArtworkDetailResponse response = client.patch()
-                                               .uri("/user/1/artwork/1/sold?sold={sold}", true)
-                                               .header("Authorization", "Bearer " + token)
-                                               .exchange()
-                                               .expectStatus().isOk()
-                                               .expectBody(ArtworkDetailResponse.class)
-                                               .returnResult()
-                                               .getResponseBody();
+        ArtworkDetailResponse response = auth.authenticated(
+                client.patch().uri("/user/1/artwork/1/sold?sold={sold}", true),
+                1L, "bob@ross.com")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(ArtworkDetailResponse.class)
+                .returnResult()
+                .getResponseBody();
 
         assertEquals(expectedDetail, response);
     }
 
     @Test
     void markSoldAsDifferentArtist() {
-        var token = jwtService.generateToken(2L, "someone-else@example.com");
-
-        client.patch()
-              .uri("/user/1/artwork/1/sold?sold={sold}", true)
-              .header("Authorization", "Bearer " + token)
-              .exchange()
-              .expectStatus().isForbidden();
+        auth.authenticated(
+                client.patch().uri("/user/1/artwork/1/sold?sold={sold}", true),
+                2L, "someone-else@example.com")
+                .exchange()
+                .expectStatus().isForbidden();
     }
 }
