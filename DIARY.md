@@ -1,5 +1,508 @@
 # Diary of my project (or what I've learnt today):
 
+## 24.08 Migrating from Bearer tokens to HttpOnly cookies, and the CSRF door that reopened
+
+This is the follow-through on the "localStorage vs cookies" section I wrote on 19.08, where I
+worked out the tradeoff on paper and then punted, since there was no frontend yet to actually test
+CORS/CSRF against. There's still no frontend. I did it anyway, because the backend can be made
+ready for it independently, and because sitting with the CSRF half of that tradeoff only in theory
+was starting to bother me more than doing the work would.
+
+### The one-sentence version of why
+
+On 19.08 the token lived in the `Authorization: Bearer <token>` header, which meant it had to live
+*somewhere in the browser* before that, and the only place that makes sense is `localStorage`.
+Anything JavaScript can read is exactly what a successful XSS attack can read too — one line,
+`localStorage.getItem("token")`, no special access needed. An `HttpOnly` cookie is invisible to
+JavaScript entirely, `document.cookie` won't show it, so that one-line theft stops being possible,
+even if the frontend does end up with an XSS bug somewhere. That's the whole motivation. Everything
+else in this entry is either "how do you actually do that" or "what does doing that cost you."
+
+### What actually changed, side by side
+
+| | 19.08 (Bearer header) | 24.08 (cookie) |
+|---|---|---|
+| where the token lives | wherever the client puts it (`localStorage`, in theory) | a cookie the browser manages |
+| who attaches it to requests | my own client code, explicitly | the browser, automatically |
+| readable by JavaScript | yes, whatever storage I picked | no (`HttpOnly`) |
+| CSRF-vulnerable | no — nothing attaches itself automatically | yes — cookies attach themselves automatically |
+| needs CSRF protection | no, correctly disabled | yes, re-enabled |
+| logout | client just forgets the token, nothing server-side needed | needs a real endpoint, since JS can't delete a cookie it can't read |
+
+That middle row is the crux of the whole entry. A cookie's defining feature, the thing that makes
+it convenient at all, is that the browser attaches it to matching requests *without being asked*.
+That is exactly what closes off the XSS-theft problem (nothing ever hands the raw token to JS) and
+exactly what reopens a different one (any *site*, not just mine, can get the browser to attach it).
+One property, two consequences, opposite directions. That took me a while to actually sit with.
+
+### The new cookie, one place that builds it
+
+Same instinct as `JwtService` being the one place that knows how to build a token: `AuthCookieService`
+is now the one place that knows how to build the cookie.
+
+```java
+public void attachAuthCookie(HttpServletResponse response, String token) {
+    var cookie = ResponseCookie.from(cookieName, token)
+            .httpOnly(true)
+            .secure(secure)
+            .sameSite("Lax")
+            .path("/")
+            .maxAge(Duration.ofMillis(expirationMs))
+            .build();
+    response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+}
+```
+
+`ResponseCookie`, not the older `jakarta.servlet.http.Cookie` — the old one has no method for
+`SameSite` at all, this is Spring's own newer type and the one that actually supports it. Each
+attribute earned its own small rabbit hole:
+
+- **`httpOnly(true)`**: the entire point, covered above.
+- **`secure(secure)`**, a property (`app.auth.cookie-secure`), not a hardcoded `true`: `Secure`
+  tells the browser "only ever send this cookie back over HTTPS." My app runs over plain
+  `http://localhost:8080` locally. If this were hardcoded `true`, login would still *set* the
+  cookie fine, but the browser (or `curl`, or Postman's jar) would then silently refuse to send it
+  back on the next request, since that request is also plain HTTP, no error, just a `401` with no
+  obvious cause. `false` locally, would flip to `true` the day this deploys somewhere with a real
+  network path an attacker could sit on, same pattern as `jwt.secret` already being
+  environment-specific.
+- **`sameSite("Lax")`**: `SameSite` governs whether a cookie gets attached to a request that
+  originates from a *different site*. `Strict` never sends it cross-site at all, not even
+  following a link in, which is a bit user-hostile for normal navigation. `None` sends it
+  everywhere, which is what a genuinely cross-origin frontend would need, and also requires
+  `Secure`. `Lax`, what I picked, still sends it on someone clicking a link into my site, but
+  withholds it on cross-site *subrequests* — a hidden auto-submitting form, a background `fetch`
+  from another page. That second category is exactly CSRF's shape. Modern browsers additionally
+  refuse `Lax` cookies on a cross-site `POST` navigation specifically (not just subrequests), which
+  is closer to a full CSRF mitigation than I first assumed, with one real gap left: a cross-site
+  top-level `GET` still gets the cookie, so a state-changing action ever implemented as `GET` would
+  still be exposed. That gap, plus not every client honoring `SameSite` correctly, is why this
+  alone wasn't enough and CSRF protection went back on too (below).
+- **`maxAge(Duration.ofMillis(expirationMs))`**: tied to the same `jwt.expiration-ms` the token
+  itself already uses, so the cookie and the token expire together instead of independently, one
+  property instead of two that could quietly drift apart.
+
+`clearAuthCookie` builds the identical cookie with an empty value and `maxAge(0)`. There is no
+"delete a cookie" verb in the cookie protocol, you just tell the browser this cookie is already
+expired and it drops it — same trick I used for the pagination default a while back, just applied
+to cookies instead of database rows.
+
+### Reading it back: one line changed in the filter
+
+`JwtAuthenticationFilter` from 19.08 barely moved:
+
+```java
+// 19.08
+var header = request.getHeader("Authorization");
+if (header != null && header.startsWith("Bearer ")) {
+    var principal = jwtService.parseToken(header.substring(7));
+    ...
+}
+
+// 24.08
+var cookie = WebUtils.getCookie(request, cookieName);
+if (cookie != null) {
+    var principal = jwtService.parseToken(cookie.getValue());
+    ...
+}
+```
+
+`WebUtils.getCookie` is `org.springframework.web.util.WebUtils`, already on the classpath, so this
+reuses an existing Spring utility rather than looping over `request.getCookies()` by hand.
+`jwtService.parseToken(...)`, `SecurityContextHolder`, the whole `ThreadLocal` mechanism I wrote up
+in detail on 19.08, none of that changed at all. Only *where the raw token string comes from*
+changed. Worth having actually noticed that, since it means everything downstream of this one line,
+`@AuthenticationPrincipal`, the ownership checks, all of it, needed zero changes.
+
+### Login and register stopped putting the token in the response body
+
+This was the part that made me stop and think, not just translate. `AuthController.login` used to
+return `AuthResponse { token }`. Now it sets the cookie and returns nothing (`204 No Content`).
+Reason: handing the same token back in the JSON body, *on top of* the `HttpOnly` cookie, would
+undo the entire point of this migration in one line, `fetch(...).then(r => r.json()).then(d =>
+d.token)` reads it right back out of the response, same as reading it out of `localStorage` would
+have. `AuthResponse` and `UserRegisterResponse` (the latter used to also carry a `token` field
+alongside the user) both got deleted once nothing referenced their token fields any more,
+`UserRegisterResponse` entirely, since a class wrapping exactly one field an existing DTO
+(`UserResponse`) already represents doesn't earn its place.
+
+Logout is a genuinely new requirement, not just a refactor. On 19.08 there was no logout endpoint
+at all, "left for later" is literally what that entry says, because with a Bearer token the client
+can just forget it, nothing server-side needs to happen. That stops being true the moment the token
+lives in an `HttpOnly` cookie: the frontend cannot delete a cookie it is not allowed to read. So
+`POST /auth/logout` now exists, calling `authCookieService.clearAuthCookie(response)`, and it's in
+`SecurityConfig`'s `permitAll()` list, clearing a cookie that may or may not exist is harmless
+either way.
+
+### Diagram 1: obtaining a CSRF token, then logging in
+
+Before touching the diagram, the token that actually protects state-changing requests here is a
+*second*, unrelated one: a CSRF token, not the JWT. Full explanation further down; this diagram
+just shows where it has to be fetched from and when.
+
+```
+Step 0 (once, before the very first state-changing request):
+
+Postman/frontend
+  │  GET /auth/csrf
+  ▼
+Spring Security's filter chain
+  ▼
+CsrfFilter.doFilterInternal(...)
+  │  GET is exempt from the CSRF check itself (DEFAULT_CSRF_MATCHER ignores
+  │  GET/HEAD/TRACE/OPTIONS), but the filter still runs on every request and calls
+  │  requestHandler.handle(...), which stashes a *lazy* CsrfToken as a request
+  │  attribute — nothing generated, nothing saved to a cookie yet
+  ▼
+AuthController.csrf(CsrfToken csrfToken)
+  │  csrfToken here is still that lazy wrapper, a promise, not a value
+  │  return csrfToken;
+  ▼
+Spring MVC serializes the return value to JSON
+  │  serialization calls csrfToken.getToken() to build the response body —
+  │  THIS call, not anything in my method body, is what forces the lazy
+  │  Supplier underneath to actually run
+  ▼
+CookieCsrfTokenRepository.saveToken(...)
+  │  generates a random value, writes it as a cookie
+  ▼
+response: Set-Cookie: XSRF-TOKEN=<value>   (deliberately NOT HttpOnly — JS
+                                             has to be able to read this one)
+  ▼
+client stores <value>, ready to echo it back as X-XSRF-TOKEN on every write
+
+Step 1: log in, now carrying that CSRF token
+
+Postman/frontend
+  │  POST /auth/login
+  │  Cookie: XSRF-TOKEN=<value>      header: X-XSRF-TOKEN: <value>
+  │  body: { email, password }
+  ▼
+CsrfFilter.doFilterInternal(...)
+  │  POST DOES require CSRF protection
+  │  compares the XSRF-TOKEN cookie's value against the X-XSRF-TOKEN header's value
+  │
+  │  mismatch or missing → AccessDeniedHandler → 403, request dies right here
+  │
+  ▼ match
+JwtAuthenticationFilter.doFilterInternal(...)
+  │  no auth_token cookie exists yet (this IS the login) → nothing to parse,
+  │  request stays unauthenticated for now — fine, /auth/login is permitAll
+  ▼
+AuthController.login(request, response)
+  ▼
+AuthService.login(request)
+  │  unchanged from 19.08: AuthenticationManager → CustomUserDetailsService →
+  │  PasswordEncoder, same DaoAuthenticationProvider wiring, same everything
+  ▼
+jwtService.generateToken(user.getId(), user.getEmail())
+  ▼
+back in AuthController:
+  │  authCookieService.attachAuthCookie(response, token)
+  ▼
+AuthCookieService.attachAuthCookie(...)
+  │  builds a ResponseCookie: HttpOnly, Secure(false in dev), SameSite=Lax,
+  │  Max-Age = jwt.expiration-ms, then writes it via response.addHeader(...)
+  ▼
+response: 204 No Content
+           Set-Cookie: auth_token=<jwt>; HttpOnly; SameSite=Lax
+  ▼
+client's cookie jar now silently holds auth_token. No JavaScript ever touches
+it, on this request or any future one — that's the entire migration, right here.
+```
+
+### Why cookies reopen CSRF, concretely against this app
+
+CSRF stands for Cross-Site Request Forgery. Concrete scenario, imagined against `kunsthaben`
+specifically: I'm logged in, browsing some unrelated page in the same browser, and that page
+contains a hidden, auto-submitting form:
+
+```html
+<form action="https://kunsthaben.com/user/1" method="POST" style="display:none">
+  <input name="city" value="Nowhere">
+</form>
+<script>document.forms[0].submit()</script>
+```
+
+The browser fires that `POST`, and it does not care that the page which triggered it was some
+other site entirely. It only checks "do I have a cookie stored for `kunsthaben.com`?", finds
+`auth_token` (I logged in earlier, in this same browser), and attaches it automatically. My server
+sees a fully authenticated request and executes it as me. The attacker never saw my token, never
+stole anything, they just got my own browser to spend a cookie on their behalf without my
+knowledge.
+
+None of this touches the Bearer-header version at all. A plain `<form>` cannot set custom headers,
+only form fields, and even `fetch`/`XHR`, which can set headers, has no way to know what my token
+even *is*, since it was never stored anywhere the attacker's page can reach. That's exactly what
+the old `SecurityConfig` comment from 19.08 says: "nothing here is a cookie, the token only ever
+gets attached because my own client code explicitly adds it." Turning cookies on without turning
+CSRF protection back on would have silently broken that sentence.
+
+### The defense: double-submit cookie pattern
+
+The mechanism (`CookieCsrfTokenRepository` + a matching request handler) works like this:
+
+1. Server hands the client a random token, in a cookie (`XSRF-TOKEN`), deliberately **not**
+   `HttpOnly`, unlike `auth_token`.
+2. Client JavaScript reads that cookie's value and echoes it back as a header (`X-XSRF-TOKEN`) on
+   every state-changing request.
+3. Server compares: does the cookie's value match the header's value? Match → proceed. Anything
+   else → `403`.
+
+Why the attacker's forged form/script cannot satisfy this: the browser still auto-attaches
+`XSRF-TOKEN` the cookie, same as `auth_token`, cookies don't discriminate. But the attacker's page
+cannot *read* that cookie's value, because browsers enforce the Same-Origin Policy: JavaScript
+running on `evil.com` is flatly forbidden from reading cookies belonging to `kunsthaben.com`,
+`HttpOnly` or not. So it can trigger the request, but it cannot construct a matching
+`X-XSRF-TOKEN` header, it has no way to know what value belongs there. A bare `<form>` is even more
+limited, since it cannot set arbitrary headers at all. One sentence for the whole mechanism:
+cookies attach automatically regardless of origin, but *reading* a cookie's value from JavaScript
+is origin-restricted, and the double-submit pattern turns that gap into the actual security check.
+
+### `.spa()`, and the trap I nearly walked into
+
+My first pass at re-enabling CSRF only set the `CsrfTokenRepository` (the cookie half). Left there,
+Spring Security's actual default `CsrfTokenRequestHandler` is `XorCsrfTokenRequestAttributeHandler`,
+which masks the real token via a bitwise XOR before exposing it anywhere, a defense against BREACH
+(a compression side-channel attack, only relevant when a token gets reflected inside a compressible
+HTML response, irrelevant to a JSON API, but still the unconditional default). If that default had
+stayed active, client JS reading the *raw* cookie value and echoing it back would never match what
+the server expects, since the server would be comparing against the *masked* version. Every request
+would fail `403` for a reason invisible from the outside, nothing wrong-looking in the request
+itself.
+
+Spring Security 7.0 ships a one-line fix for exactly this, `.csrf(csrf -> csrf.spa())`, "spa" being
+Single Page Application. I checked the real 7.1.0 source (this project's actual dependency, in
+`~/.m2`, not assumed) rather than trust an old tutorial, same habit as the `FunctionContributor`
+investigation back on 19.08's neighbor entry:
+
+```java
+public CsrfConfigurer<H> spa() {
+    this.csrfTokenRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
+    this.requestHandler = new SpaCsrfTokenRequestHandler();
+    return this;
+}
+```
+
+Two lines, doing exactly the cookie-plus-correct-handler pairing I'd been about to hand-wire
+incorrectly.
+
+### The lazy token, and why `/auth/csrf` isn't a no-op
+
+Reading `CsrfFilter`'s real source directly answered something that would otherwise have been a
+mystery for a while: the CSRF token is **lazy**. On a `GET`, Spring Security makes the token
+*available* as a request attribute but does not force it to actually generate and save (write
+`Set-Cookie`) unless something calls `.getToken()` on it, normally a server-rendered template
+referencing `${_csrf.token}`. This app has no server-rendered views at all, so without a dedicated
+endpoint, nothing would ever force that resolution, and the client would have no way to obtain a
+token in the first place.
+
+The fix, copied verbatim from Spring Security's own reference docs (not reconstructed from memory,
+[docs.spring.io/spring-security/reference/servlet/exploits/csrf.html](https://docs.spring.io/spring-security/reference/servlet/exploits/csrf.html),
+the Mobile Applications / "Integrating with CSRF Protection" section):
+
+```java
+@GetMapping("/auth/csrf")
+CsrfToken csrf(CsrfToken csrfToken) {
+    return csrfToken;
+}
+```
+
+This confused me at first, it reads like a method that does nothing at all, receives a value and
+hands it straight back. The `csrfToken` parameter isn't something the client sends, it's resolved
+by `CsrfTokenArgumentResolver` from the request attribute the filter already stashed, the same
+argument-resolver mechanism `@AuthenticationPrincipal` uses. And `return csrfToken;` is not a
+no-op: it makes Spring MVC serialize that object to JSON, which means calling its getters,
+`getToken()` included, and *that* call is what forces the lazy `Supplier` to actually run,
+generating a real value and saving it as a cookie. The side effect is entirely implicit, hidden
+inside JSON serialization rather than visible in the method body, which is a fair criticism of the
+pattern, but it's the one Spring Security's own docs recommend, and I verified it rather than just
+trusting either the docs or my own reading of the source:
+
+```
+$ curl -sD - -o /dev/null http://localhost:8080/auth/csrf
+Set-Cookie: XSRF-TOKEN=3857bdf8-fa91-4e7b-87d0-9bd331befd27; Path=/
+```
+
+### Diagram 2: calling a protected, state-changing endpoint
+
+This is the direct update to 19.08's Phase 2 diagram. The shape is the same, filter chain, then
+authorization, then controller, but there's a new filter in the chain, and *where* it sits actually
+matters. I checked the real filter ordering (`FilterOrderRegistration` in the actual
+`spring-security-config` source) instead of assuming: `CsrfFilter` is registered very early, well
+before `UsernamePasswordAuthenticationFilter`. `JwtAuthenticationFilter` is inserted via
+`addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)`, so it sits
+right before that filter, which puts it *after* `CsrfFilter` in the real chain. `AuthorizationFilter`,
+the one that actually reads `SecurityConfig`'s `.anyRequest().authenticated()` rule, runs dead last.
+
+```
+Postman/frontend
+  │  PUT /user/1
+  │  Cookie: auth_token=<jwt>; XSRF-TOKEN=<value>
+  │  header: X-XSRF-TOKEN: <value>
+  │  body: { city, postcode, about, ... }
+  ▼
+CsrfFilter        (runs FIRST — registered well before UsernamePasswordAuthenticationFilter)
+  │  PUT requires CSRF protection
+  │  reads the XSRF-TOKEN cookie, reads the X-XSRF-TOKEN header, compares them
+  │
+  │  mismatch/missing → AccessDeniedHandler → 403, request dies right here —
+  │                      JwtAuthenticationFilter and my controller are never reached at all
+  │
+  ▼ match
+JwtAuthenticationFilter   (runs next — addFilterBefore(..., UsernamePasswordAuthenticationFilter.class))
+  │  WebUtils.getCookie(request, "auth_token")
+  │  jwtService.parseToken(cookie.getValue())
+  │  valid → SecurityContextHolder gets a populated Authentication, exactly like the
+  │          Bearer-header version, just sourced from a cookie instead of a header
+  ▼
+AuthorizationFilter   (runs LAST — this is what actually reads SecurityConfig's rules)
+  │  is PUT /user/1 in the permitAll list? No.
+  │  is SecurityContextHolder populated, from the step above? Yes → allowed.
+  │
+  │  (if the cookie had been missing or invalid instead: SecurityContextHolder
+  │   would still be empty here, an anonymous-but-non-null Authentication →
+  │   REJECTED — with 403, not 401, exactly the distinction from 19.08, since a
+  │   custom SecurityFilterChain already exists)
+  ▼
+DispatcherServlet routes to UserController.update(...)
+  │  @AuthenticationPrincipal AuthPrincipal principal   ← unchanged since 19.08,
+  │                                                        reads the same ThreadLocal slot
+  │  throwForbiddenIfNotOwned(principal, id)
+  ▼
+response goes back. Nothing past this point changed at all from the Bearer-header version.
+```
+
+Verified this with real curl against the running app, not just from reading source:
+`PUT /user/1` with a valid `auth_token` cookie but no `X-XSRF-TOKEN` header → `403`, dies at
+`CsrfFilter`, never reaches my controller. Then logged out (`auth_token` cleared from the jar
+entirely), retried the same `PUT` with a *valid* CSRF token but no auth cookie → also `403`, this
+time from `AuthorizationFilter` at the very end of the chain instead. Both failures return an
+identical, generic `403 Forbidden` body. From outside, there is no way to tell which of the two
+layers rejected the request, which strikes me as reasonable (don't leak which check failed) but is
+worth remembering the next time a `403` shows up somewhere unexpected: check both layers, not just
+the one that seems more likely.
+
+### Testing this: a shared helper, not copy-pasted boilerplate everywhere
+
+Every existing `@SpringBootTest` doing a `POST`/`PUT`/`DELETE`, four separate test files, started
+failing `403` the moment CSRF went back on, on top of already needing the header-to-cookie swap
+from the filter change. Rather than hand-writing the same "fetch a CSRF token, attach both cookies"
+dance in each file, it lives in one place now:
+`src/test/java/io/everyonecodes/project_module/testsupport/AuthTestSupport.java`, composed into
+each test class (not an abstract base class, a deliberate choice, to keep each test class
+self-contained instead of coupled through inheritance):
+
+```java
+public RestTestClient.RequestHeadersSpec<?> withCsrf(RestTestClient.RequestHeadersSpec<?> request) {
+    var csrfToken = client.get().uri("/auth/csrf").exchange().returnResult()
+                          .getResponseCookies().getFirst("XSRF-TOKEN").getValue();
+    return request.cookie("XSRF-TOKEN", csrfToken).header("X-XSRF-TOKEN", csrfToken);
+}
+
+public RestTestClient.RequestHeadersSpec<?> authenticated(RestTestClient.RequestHeadersSpec<?> request,
+                                                           Long userId, String email) {
+    var authToken = jwtService.generateToken(userId, email);
+    return withCsrf(request.cookie(cookieName, authToken));
+}
+```
+
+Each test class builds one in `@BeforeEach`, not as a field initializer. That distinction actually
+matters and cost me a moment to see why: `@Autowired`/`@Value` fields aren't populated by field
+initializers at all, JUnit constructs the test instance first (running any field initializers right
+then, with those fields still `null`), and only afterward does a Spring `TestExecutionListener`
+reach in and set them via reflection. `@BeforeEach` runs later, after that injection has already
+happened, so it's the first point where `client`/`jwtService`/`cookieName` are guaranteed to be
+real.
+
+Two things this sweep caught that weren't really about cookies at all:
+
+- Six `...NotOwnedProfile`-style tests had started passing for the *wrong* reason the moment the
+  filter switched from header to cookie, they expect `403`, and were getting it purely from missing
+  auth, not from the ownership check they were actually meant to exercise. They test the real thing
+  again now.
+- `AuthControllerTest` itself, run on its own, looked fine, its own tests had already been updated
+  for the cookie behavior earlier. Running the *whole* suite together is what surfaced that its
+  `login`/`logout` tests still fired bare requests with no CSRF token, since they'd been written
+  before CSRF was turned back on. A useful reminder that file-by-file test runs can hide a
+  regression that only the full suite catches.
+
+Full suite, all four rewritten files plus `AuthControllerTest`'s fix: `192/192` passing.
+
+### What's still left, on purpose
+
+- `JwtAuthenticationFilterTest` still doesn't exist, a gap that predates this migration, from 19.08,
+  not something today created.
+- No CORS configuration, still not needed, still no frontend to configure it for. The day one
+  exists on a different origin, `CorsConfigurationSource` with `allowCredentials(true)` becomes
+  necessary, and `SameSite=Lax` may need reconsidering too depending on whether that frontend ends
+  up same-site or genuinely cross-origin.
+- `app.auth.cookie-secure=false` is a dev-only default, would flip to `true` the day this runs
+  somewhere with a real network path for an attacker to sit on.
+
+## 21.08 What "add more languages" actually means for search, and why LIKE was never going to be fast regardless of stemming
+
+Both full-text search branches hardcode `'english'` in two places, the `to_tsvector('english', ...)`
+in the generated column and the `websearch_to_tsquery('english', :keywords)` in the query. I asked
+myself what happens the day an artwork's title or description is in French or German, and started
+down a path I want to record properly, because my first answer to it was wrong in an instructive
+way.
+
+### What actually happens if I just leave `'english'` in place
+
+Postgres's `to_tsvector('english', text)` does two separate jobs: tokenizing the text into words,
+which is mostly language-agnostic, and running each token through English's stopword list and
+English's stemmer, which is not. Feed it a French or German word and the tokenizer still splits it
+out fine, but the English stemmer has no rule that applies to it, so the token passes through close
+to unchanged, no correct stemming, but also no actively wrong transformation. In practice that means
+search on non-English content, under an English config, degrades toward matching the exact word as
+typed. Still better than nothing, `websearch_to_tsquery`'s phrase/AND/OR/exclusion parsing keeps
+working regardless of language, that part is not stemming-dependent at all, only the "painted" ↔
+"painting" style matching stops working for anything that is not English.
+
+### How real multi-language products actually handle this
+
+Tagging every row with a language and switching `regconfig` per row is a real pattern, but it shows
+up more for single-language-per-tenant systems than for one catalog with mixed-language rows
+searched together, which is closer to what an art marketplace actually is. For a mixed catalog,
+there are roughly three real answers, in increasing order of cost. The cheapest is Postgres's
+`'simple'` config used uniformly, no stemming for anyone, English included, but honest and
+consistent across every row, no per-row bookkeeping required. The middle option is detecting or
+asking for a language per document and either scoping each search to one language or maintaining a
+`tsvector` per candidate language, ORed together at query time, real infrastructure with an ongoing
+cost, not a one-time change. The expensive answer, and the one most serious multi-language search
+products actually reach for, is moving off Postgres full-text search entirely onto a dedicated search
+engine such as Elasticsearch or Algolia, which handles per-document language analyzers and ranking
+properly, at the cost of a whole new service to run and keep in sync.
+
+Given the size of this project, `'simple'` is the one that actually fits. Not decided in code yet,
+this entry is the reasoning, the actual property/config change is still to do, but the `language`
+column idea is one I am setting aside rather than building.
+
+### The part that actually matters more: why any of this beats LIKE at all
+
+Separately from stemming, I wanted to nail down why `tsvector` search is *fast* compared to the
+`LIKE '%word%'` version this replaced, since I realized I had been fuzzy on the actual mechanism.
+`LIKE '%word%'` has a wildcard on both sides. A B-tree index stores values in sorted order, which
+only helps when a match can be expressed as a contiguous range, true for `LIKE 'word%'`, not true for
+a leading `%`, since the match could start anywhere inside the text. So Postgres cannot use an index
+for it at all, it falls back to reading every row and running a string search on each one, cost
+scales with the number of rows and the length of their text, with or without an index defined.
+
+A GIN index over `tsvector` is a different structure entirely, an inverted index. For every distinct
+token that appears anywhere in the column, it stores a sorted list of which rows contain it, "sky" →
+rows 4, 17, 92. A query looks the token up directly, an index lookup, not a scan, and gets back only
+the matching rows. Multi-word queries intersect the per-word lists, still without touching the table.
+That mechanism cares only about tokens being looked up by exact key, it has no opinion on whether the
+token is a stemmed root or a raw lowercased word. Which is exactly why switching from `'english'` to
+`'simple'` costs nothing in speed, it only changes what gets stored as the token, not the index
+structure or the lookup itself. Stemming was never what made this fast. Indexability was.
+
+One thing worth remembering for later, not needed now: Postgres also has `pg_trgm`, a GIN/GiST index
+over trigrams that does make `LIKE`-style substring search indexable. Different tool, for when the
+actual requirement is "contains this fragment anywhere," typo tolerance included, rather than
+whole-word search, which `tsvector` already covers.
+
 ## 21.08 Full-text search, take two: the plain native-SQL branch, and what it costs to skip the stored column
 
 This is the second branch mentioned at the end of the entry below,
@@ -19,6 +522,7 @@ So instead, the keyword filter runs as its own tiny native query first, returnin
 ids:
 
 ```java
+
 @Query(value = "SELECT id FROM artwork WHERE search_vector @@ websearch_to_tsquery('english', :keywords)",
         nativeQuery = true)
 List<Long> findIdsMatchingKeywords(@Param("keywords") String keywords);
@@ -41,16 +545,30 @@ short-circuits to an empty result without touching the main query at all if noth
 var specification = ArtworkSpecifications.build(filter);
 
 var keywords = filter.getKeywords();
-if (keywords != null && !keywords.isBlank()) {
-    var matchingIds = repository.findIdsMatchingKeywords(keywords);
-    if (matchingIds.isEmpty()) {
-        return new SliceImpl<>(List.of(), pageable, false);
-    }
-    specification = specification.and(ArtworkSpecifications.hasIdIn(matchingIds));
-}
+if(keywords !=null&&!keywords.
 
-return repository.findBy(specification, query -> query.slice(pageable))
-                 .map(ArtworkCardResponse::from);
+isBlank()){
+var matchingIds = repository.findIdsMatchingKeywords(keywords);
+    if(matchingIds.
+
+isEmpty()){
+        return new SliceImpl<>(List.
+
+of(),pageable, false);
+        }
+specification =specification.
+
+and(ArtworkSpecifications.hasIdIn(matchingIds));
+        }
+
+        return repository.
+
+findBy(specification, query ->query.
+
+slice(pageable))
+        .
+
+map(ArtworkCardResponse::from);
 ```
 
 The column and its GIN index are exactly the same two lines as the Hibernate branch, still raw SQL
@@ -59,7 +577,7 @@ in `fulltext-search.sql`, since there is still no annotation for "make this a GI
 ```sql
 ALTER TABLE artwork
     ADD COLUMN search_vector tsvector
-    GENERATED ALWAYS AS (to_tsvector('english', coalesce(title, '') || ' ' || coalesce(description, ''))) STORED;
+        GENERATED ALWAYS AS (to_tsvector('english', coalesce(title, '') || ' ' || coalesce(description, ''))) STORED;
 
 CREATE INDEX idx_artwork_search_vector ON artwork USING GIN (search_vector);
 ```
@@ -109,10 +627,11 @@ with no column and no `ALTER TABLE`:
 
 ```sql
 CREATE INDEX idx_artwork_search ON artwork
-    USING GIN (to_tsvector('english', coalesce(title, '') || ' ' || coalesce(description, '')));
+    USING GIN (to_tsvector('english', coalesce (title, '') || ' ' || coalesce (description, '')));
 ```
 
 ```java
+
 @Query(value = """
         SELECT id FROM artwork
         WHERE to_tsvector('english', coalesce(title,'') || ' ' || coalesce(description,''))
@@ -217,6 +736,7 @@ well-known library (actively maintained, checked its GitHub push history before 
 column into a plain Java `String`.
 
 ```xml
+
 <dependency>
     <groupId>io.hypersistence</groupId>
     <artifactId>hypersistence-utils-hibernate-73</artifactId>
@@ -234,6 +754,7 @@ copying a version blindly is the thing worth keeping.
 ### The generated column on `Artwork`
 
 ```java
+
 @Type(PostgreSQLTSVectorType.class)
 @Column(columnDefinition = "tsvector GENERATED ALWAYS AS " +
         "(to_tsvector('english', coalesce(title, '') || ' ' || coalesce(description, ''))) STORED",
@@ -332,8 +853,8 @@ public class TsMatchFunctionContributor implements FunctionContributor {
     @Override
     public void contributeFunctions(FunctionContributions functionContributions) {
         var booleanType = functionContributions.getTypeConfiguration()
-                                                .getBasicTypeRegistry()
-                                                .resolve(StandardBasicTypes.BOOLEAN);
+                                               .getBasicTypeRegistry()
+                                               .resolve(StandardBasicTypes.BOOLEAN);
 
         functionContributions.getFunctionRegistry()
                              .registerPattern("ts_match", "?1 @@ ?2", booleanType);
