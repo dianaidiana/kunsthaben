@@ -49,4 +49,6 @@ public final class ErrorMessages {
     public static final String INVALID_CREDENTIALS = "Invalid credentials";
     public static final String INVALID_TOKEN = "invalid token";
 
+    public static final String CONTENT_REQUIRED = "Message content can't be empty";
+    public static final String MAX_CHARACTERS = "The message exceeds the maximum of characters allowed";
 }
