@@ -12,11 +12,17 @@ import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(
         check = @CheckConstraint(constraint = "buyer_id <> seller_id"),
-        uniqueConstraints = @UniqueConstraint(columnNames = {"artwork_id", "buyer_id"})
+        uniqueConstraints = @UniqueConstraint(columnNames = {"artwork_id", "buyer_id"}),
+        indexes = {
+                @Index(name = "idx_chat_seller_id", columnList = "seller_id"),
+                @Index(name = "idx_chat_buyer_id", columnList = "buyer_id")
+        }
 )
 @Getter
 @Setter
@@ -49,4 +55,10 @@ public class Chat {
 
     @Column(columnDefinition = "BOOLEAN DEFAULT true")
     private boolean active;
+
+    @OneToMany(mappedBy = "chat")
+    @OrderBy("createdAt DESC")
+    private List<Message> messages = new ArrayList<>();
 }
+
+// TODO: user can delete messages?
