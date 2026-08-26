@@ -17,6 +17,7 @@ import java.time.OffsetDateTime;
 @Setter
 @AllArgsConstructor
 @NoArgsConstructor
+@Table(indexes = @Index(name = "idx_message_chat_id", columnList = "chat_id"))
 public class Message {
 
     @Id
