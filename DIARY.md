@@ -6,24 +6,39 @@ On 19.08 the token lived in the `Authorization: Bearer <token>` header, which me
 *somewhere in the browser* before that, and the only place that makes sense is `localStorage`.
 Anything JavaScript can read is exactly what a successful XSS attack can read too. An `HttpOnly` cookie is invisible to
 JavaScript entirely, `document.cookie` won't show it, so that one-line theft stops being possible,
-even if the frontend does end up with an XSS bug somewhere. That's the whole motivation. Everything
-else in this entry is either "how do you actually do that" or "what does doing that cost you."
+even if the frontend does end up with an XSS bug somewhere.
 
-### The changes
+[//]: # ()
 
-|                             | 19.08 (Bearer header)                                     | 24.08 (cookie)                                                      |
-|-----------------------------|-----------------------------------------------------------|---------------------------------------------------------------------|
-| where the token lives       | wherever the client puts it (`localStorage`, in theory)   | a cookie the browser manages                                        |
-| who attaches it to requests | my own client code, explicitly                            | the browser, automatically                                          |
-| readable by JavaScript      | yes, whatever storage I picked                            | no (`HttpOnly`)                                                     |
-| CSRF-vulnerable             | no — nothing attaches itself automatically                | yes — cookies attach themselves automatically                       |
-| needs CSRF protection       | no, correctly disabled                                    | yes, re-enabled                                                     |
-| logout                      | client just forgets the token, nothing server-side needed | needs a real endpoint, since JS can't delete a cookie it can't read |
+[//]: # (### The changes)
 
-That middle row is the crux of the whole entry. A cookie's defining feature, the thing that makes
-it convenient at all, is that the browser attaches it to matching requests *without being asked*.
-That is exactly what closes off the XSS-theft problem (nothing ever hands the raw token to JS) and
-exactly what reopens a different one (any *site*, not just mine, can get the browser to attach it).
+[//]: # ()
+
+[//]: # (|                             | 19.08 &#40;Bearer header&#41;                                     | 24.08 &#40;cookie&#41;                                                      |)
+
+[//]: # (|-----------------------------|-----------------------------------------------------------|---------------------------------------------------------------------|)
+
+[//]: # (| where the token lives       | wherever the client puts it &#40;`localStorage`, in theory&#41;   | a cookie the browser manages                                        |)
+
+[//]: # (| who attaches it to requests | my own client code, explicitly                            | the browser, automatically                                          |)
+
+[//]: # (| readable by JavaScript      | yes, whatever storage I picked                            | no &#40;`HttpOnly`&#41;                                                     |)
+
+[//]: # (| CSRF-vulnerable             | no — nothing attaches itself automatically                | yes — cookies attach themselves automatically                       |)
+
+[//]: # (| needs CSRF protection       | no, correctly disabled                                    | yes, re-enabled                                                     |)
+
+[//]: # (| logout                      | client just forgets the token, nothing server-side needed | needs a real endpoint, since JS can't delete a cookie it can't read |)
+
+[//]: # ()
+
+[//]: # (That middle row is the crux of the whole entry. A cookie's defining feature, the thing that makes)
+
+[//]: # (it convenient at all, is that the browser attaches it to matching requests *without being asked*.)
+
+[//]: # (That is exactly what closes off the XSS-theft problem &#40;nothing ever hands the raw token to JS&#41; and)
+
+[//]: # (exactly what reopens a different one &#40;any *site*, not just mine, can get the browser to attach it&#41;.)
 
 ### The new cookie, one place that builds it
 
@@ -43,9 +58,7 @@ public void attachAuthCookie(HttpServletResponse response, String token) {
 }
 ```
 
-`ResponseCookie`, not the older `jakarta.servlet.http.Cookie` — the old one has no method for
-`SameSite` at all, this is Spring's own newer type and the one that actually supports it. Each
-attribute earned its own small rabbit hole:
+Each attribute earned its own small rabbit hole:
 
 - **`httpOnly(true)`**: the entire point, covered above.
 - **`secure(secure)`**, a property (`app.auth.cookie-secure`), not a hardcoded `true`: `Secure`
@@ -252,7 +265,7 @@ limited, since it cannot set arbitrary headers at all. One sentence for the whol
 cookies attach automatically regardless of origin, but *reading* a cookie's value from JavaScript
 is origin-restricted, and the double-submit pattern turns that gap into the actual security check.
 
-### `.spa()`
+### `.spa()`: single page application
 
 My first pass at re-enabling CSRF only set the `CsrfTokenRepository` (the cookie half). Left there,
 Spring Security's actual default `CsrfTokenRequestHandler` is `XorCsrfTokenRequestAttributeHandler`,
@@ -265,9 +278,7 @@ would fail `403` for a reason invisible from the outside, nothing wrong-looking 
 itself.
 
 Spring Security 7.0 ships a one-line fix for exactly this, `.csrf(csrf -> csrf.spa())`, "spa" being
-Single Page Application. I checked the real 7.1.0 source (this project's actual dependency, in
-`~/.m2`, not assumed) rather than trust an old tutorial, same habit as the `FunctionContributor`
-investigation back on 19.08's neighbor entry:
+Single Page Application.
 
 ```java
 public CsrfConfigurer<H> spa() {
@@ -290,9 +301,7 @@ referencing `${_csrf.token}`. This app has no server-rendered views at all, so w
 endpoint, nothing would ever force that resolution, and the client would have no way to obtain a
 token in the first place.
 
-The fix, copied verbatim from Spring Security's own reference docs (not reconstructed from memory,
-[docs.spring.io/spring-security/reference/servlet/exploits/csrf.html](https://docs.spring.io/spring-security/reference/servlet/exploits/csrf.html),
-the Mobile Applications / "Integrating with CSRF Protection" section):
+The fix, copied verbatim from Spring Security's own reference docs:
 
 ```java
 
