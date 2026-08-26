@@ -1,6 +1,5 @@
 package io.everyonecodes.project_module.auth;
 
-import io.everyonecodes.project_module.auth.dto.AuthResponse;
 import io.everyonecodes.project_module.auth.dto.LoginRequest;
 import io.everyonecodes.project_module.exceptions.ErrorMessages;
 import io.everyonecodes.project_module.exceptions.UnauthorizedException;
