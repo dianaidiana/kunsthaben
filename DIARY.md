@@ -1,39 +1,29 @@
 # Diary of my project (or what I've learnt today):
 
-## 24.08 Migrating from Bearer tokens to HttpOnly cookies, and the CSRF door that reopened
-
-This is the follow-through on the "localStorage vs cookies" section I wrote on 19.08, where I
-worked out the tradeoff on paper and then punted, since there was no frontend yet to actually test
-CORS/CSRF against. There's still no frontend. I did it anyway, because the backend can be made
-ready for it independently, and because sitting with the CSRF half of that tradeoff only in theory
-was starting to bother me more than doing the work would.
-
-### The one-sentence version of why
+## 24.08 Migrating from Bearer tokens to HttpOnly cookies
 
 On 19.08 the token lived in the `Authorization: Bearer <token>` header, which meant it had to live
 *somewhere in the browser* before that, and the only place that makes sense is `localStorage`.
-Anything JavaScript can read is exactly what a successful XSS attack can read too — one line,
-`localStorage.getItem("token")`, no special access needed. An `HttpOnly` cookie is invisible to
+Anything JavaScript can read is exactly what a successful XSS attack can read too. An `HttpOnly` cookie is invisible to
 JavaScript entirely, `document.cookie` won't show it, so that one-line theft stops being possible,
 even if the frontend does end up with an XSS bug somewhere. That's the whole motivation. Everything
 else in this entry is either "how do you actually do that" or "what does doing that cost you."
 
-### What actually changed, side by side
+### The changes
 
-| | 19.08 (Bearer header) | 24.08 (cookie) |
-|---|---|---|
-| where the token lives | wherever the client puts it (`localStorage`, in theory) | a cookie the browser manages |
-| who attaches it to requests | my own client code, explicitly | the browser, automatically |
-| readable by JavaScript | yes, whatever storage I picked | no (`HttpOnly`) |
-| CSRF-vulnerable | no — nothing attaches itself automatically | yes — cookies attach themselves automatically |
-| needs CSRF protection | no, correctly disabled | yes, re-enabled |
-| logout | client just forgets the token, nothing server-side needed | needs a real endpoint, since JS can't delete a cookie it can't read |
+|                             | 19.08 (Bearer header)                                     | 24.08 (cookie)                                                      |
+|-----------------------------|-----------------------------------------------------------|---------------------------------------------------------------------|
+| where the token lives       | wherever the client puts it (`localStorage`, in theory)   | a cookie the browser manages                                        |
+| who attaches it to requests | my own client code, explicitly                            | the browser, automatically                                          |
+| readable by JavaScript      | yes, whatever storage I picked                            | no (`HttpOnly`)                                                     |
+| CSRF-vulnerable             | no — nothing attaches itself automatically                | yes — cookies attach themselves automatically                       |
+| needs CSRF protection       | no, correctly disabled                                    | yes, re-enabled                                                     |
+| logout                      | client just forgets the token, nothing server-side needed | needs a real endpoint, since JS can't delete a cookie it can't read |
 
 That middle row is the crux of the whole entry. A cookie's defining feature, the thing that makes
 it convenient at all, is that the browser attaches it to matching requests *without being asked*.
 That is exactly what closes off the XSS-theft problem (nothing ever hands the raw token to JS) and
 exactly what reopens a different one (any *site*, not just mine, can get the browser to attach it).
-One property, two consequences, opposite directions. That took me a while to actually sit with.
 
 ### The new cookie, one place that builds it
 
@@ -43,12 +33,12 @@ is now the one place that knows how to build the cookie.
 ```java
 public void attachAuthCookie(HttpServletResponse response, String token) {
     var cookie = ResponseCookie.from(cookieName, token)
-            .httpOnly(true)
-            .secure(secure)
-            .sameSite("Lax")
-            .path("/")
-            .maxAge(Duration.ofMillis(expirationMs))
-            .build();
+                               .httpOnly(true)
+                               .secure(secure)
+                               .sameSite("Lax")
+                               .path("/")
+                               .maxAge(Duration.ofMillis(expirationMs))
+                               .build();
     response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
 }
 ```
@@ -94,17 +84,19 @@ to cookies instead of database rows.
 ```java
 // 19.08
 var header = request.getHeader("Authorization");
-if (header != null && header.startsWith("Bearer ")) {
-    var principal = jwtService.parseToken(header.substring(7));
+if(header !=null&&header.
+
+startsWith("Bearer ")){
+var principal = jwtService.parseToken(header.substring(7));
     ...
-}
+            }
 
 // 24.08
 var cookie = WebUtils.getCookie(request, cookieName);
-if (cookie != null) {
-    var principal = jwtService.parseToken(cookie.getValue());
+if(cookie !=null){
+var principal = jwtService.parseToken(cookie.getValue());
     ...
-}
+            }
 ```
 
 `WebUtils.getCookie` is `org.springframework.web.util.WebUtils`, already on the classpath, so this
@@ -116,8 +108,8 @@ changed. Worth having actually noticed that, since it means everything downstrea
 
 ### Login and register stopped putting the token in the response body
 
-This was the part that made me stop and think, not just translate. `AuthController.login` used to
-return `AuthResponse { token }`. Now it sets the cookie and returns nothing (`204 No Content`).
+`AuthController.login` used to return `AuthResponse { token }`. Now it sets the cookie and returns nothing (
+`204 No Content`).
 Reason: handing the same token back in the JSON body, *on top of* the `HttpOnly` cookie, would
 undo the entire point of this migration in one line, `fetch(...).then(r => r.json()).then(d =>
 d.token)` reads it right back out of the response, same as reading it out of `localStorage` would
@@ -126,8 +118,8 @@ alongside the user) both got deleted once nothing referenced their token fields 
 `UserRegisterResponse` entirely, since a class wrapping exactly one field an existing DTO
 (`UserResponse`) already represents doesn't earn its place.
 
-Logout is a genuinely new requirement, not just a refactor. On 19.08 there was no logout endpoint
-at all, "left for later" is literally what that entry says, because with a Bearer token the client
+On 19.08 there was no logout endpoint at all, "left for later" is literally what that entry says, because with a Bearer
+token the client
 can just forget it, nothing server-side needs to happen. That stops being true the moment the token
 lives in an `HttpOnly` cookie: the frontend cannot delete a cookie it is not allowed to read. So
 `POST /auth/logout` now exists, calling `authCookieService.clearAuthCookie(response)`, and it's in
@@ -218,8 +210,9 @@ specifically: I'm logged in, browsing some unrelated page in the same browser, a
 contains a hidden, auto-submitting form:
 
 ```html
+
 <form action="https://kunsthaben.com/user/1" method="POST" style="display:none">
-  <input name="city" value="Nowhere">
+    <input name="city" value="Nowhere">
 </form>
 <script>document.forms[0].submit()</script>
 ```
@@ -259,7 +252,7 @@ limited, since it cannot set arbitrary headers at all. One sentence for the whol
 cookies attach automatically regardless of origin, but *reading* a cookie's value from JavaScript
 is origin-restricted, and the double-submit pattern turns that gap into the actual security check.
 
-### `.spa()`, and the trap I nearly walked into
+### `.spa()`
 
 My first pass at re-enabling CSRF only set the `CsrfTokenRepository` (the cookie half). Left there,
 Spring Security's actual default `CsrfTokenRequestHandler` is `XorCsrfTokenRequestAttributeHandler`,
@@ -302,6 +295,7 @@ The fix, copied verbatim from Spring Security's own reference docs (not reconstr
 the Mobile Applications / "Integrating with CSRF Protection" section):
 
 ```java
+
 @GetMapping("/auth/csrf")
 CsrfToken csrf(CsrfToken csrfToken) {
     return csrfToken;
@@ -383,7 +377,7 @@ layers rejected the request, which strikes me as reasonable (don't leak which ch
 worth remembering the next time a `403` shows up somewhere unexpected: check both layers, not just
 the one that seems more likely.
 
-### Testing this: a shared helper, not copy-pasted boilerplate everywhere
+### Testing this: a shared helper
 
 Every existing `@SpringBootTest` doing a `POST`/`PUT`/`DELETE`, four separate test files, started
 failing `403` the moment CSRF went back on, on top of already needing the header-to-cookie swap
@@ -401,7 +395,7 @@ public RestTestClient.RequestHeadersSpec<?> withCsrf(RestTestClient.RequestHeade
 }
 
 public RestTestClient.RequestHeadersSpec<?> authenticated(RestTestClient.RequestHeadersSpec<?> request,
-                                                           Long userId, String email) {
+                                                          Long userId, String email) {
     var authToken = jwtService.generateToken(userId, email);
     return withCsrf(request.cookie(cookieName, authToken));
 }
@@ -427,18 +421,25 @@ Two things this sweep caught that weren't really about cookies at all:
   before CSRF was turned back on. A useful reminder that file-by-file test runs can hide a
   regression that only the full suite catches.
 
-Full suite, all four rewritten files plus `AuthControllerTest`'s fix: `192/192` passing.
+[//]: # (### What's still left, on purpose)
 
-### What's still left, on purpose
+[//]: # ()
 
-- `JwtAuthenticationFilterTest` still doesn't exist, a gap that predates this migration, from 19.08,
-  not something today created.
-- No CORS configuration, still not needed, still no frontend to configure it for. The day one
-  exists on a different origin, `CorsConfigurationSource` with `allowCredentials(true)` becomes
-  necessary, and `SameSite=Lax` may need reconsidering too depending on whether that frontend ends
-  up same-site or genuinely cross-origin.
-- `app.auth.cookie-secure=false` is a dev-only default, would flip to `true` the day this runs
-  somewhere with a real network path for an attacker to sit on.
+[//]: # (- `JwtAuthenticationFilterTest` still doesn't exist, a gap that predates this migration, from 19.08,)
+
+[//]: # (  not something today created.)
+
+[//]: # (- No CORS configuration, still not needed, still no frontend to configure it for. The day one)
+
+[//]: # (  exists on a different origin, `CorsConfigurationSource` with `allowCredentials&#40;true&#41;` becomes)
+
+[//]: # (  necessary, and `SameSite=Lax` may need reconsidering too depending on whether that frontend ends)
+
+[//]: # (  up same-site or genuinely cross-origin.)
+
+[//]: # (- `app.auth.cookie-secure=false` is a dev-only default, would flip to `true` the day this runs)
+
+[//]: # (  somewhere with a real network path for an attacker to sit on.)
 
 ## 21.08 What "add more languages" actually means for search, and why LIKE was never going to be fast regardless of stemming
 
