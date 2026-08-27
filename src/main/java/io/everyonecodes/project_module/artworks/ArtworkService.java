@@ -14,6 +14,8 @@ import io.everyonecodes.project_module.classification.media.Media;
 import io.everyonecodes.project_module.classification.media.MediaService;
 import io.everyonecodes.project_module.classification.support.Support;
 import io.everyonecodes.project_module.classification.support.SupportService;
+import io.everyonecodes.project_module.exceptions.ErrorMessages;
+import io.everyonecodes.project_module.exceptions.NotFoundException;
 import io.everyonecodes.project_module.users.UserService;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
@@ -162,6 +164,11 @@ public class ArtworkService {
             return null;
         }
         return supportService.fetchSupport(supportId);
+    }
+
+    public Artwork fetchArtwork(Long id) {
+        return repository.findByIdAndDeletedAtIsNull(id)
+                         .orElseThrow(() -> new NotFoundException(ErrorMessages.ARTWORK_NOT_FOUND));
     }
 }
 
