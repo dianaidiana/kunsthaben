@@ -30,14 +30,13 @@ public class ChatSummaryResponse {
         var artwork = chat.getArtwork();
         var images = artwork.getImages();
         var buyer = chat.getBuyer();
-        var seller = chat.getSeller();
 
         return new ChatSummaryResponse(
                 chat.getId(),
                 artwork.getId(),
                 artwork.getTitle(),
                 images.isEmpty() ? null : images.getFirst().getUrl(),
-                UserResponse.from(buyer.getId().equals(viewerId) ? seller : buyer),
+                UserResponse.from(buyer.getId().equals(viewerId) ? artwork.getArtist() : buyer),
                 lastMessage.getContent(),
                 lastMessage.getCreatedAt(),
                 lastMessage.isRead(),

@@ -12,6 +12,6 @@ public interface ChatRepository extends JpaRepository<Chat, Long> {
 
     Optional<Chat> findByArtworkIdAndBuyerId(Long artworkId, Long buyerId);
 
-    @Query("SELECT c FROM Chat c WHERE c.buyer.id = :userId OR c.seller.id = :userId")
+    @Query("SELECT c FROM Chat c WHERE c.buyer.id = :userId OR c.artwork.artist.id = :userId")
     Page<Chat> findByParticipantId(@Param("userId") Long userId, Pageable pageable);
 }

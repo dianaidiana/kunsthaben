@@ -17,12 +17,8 @@ import java.util.List;
 
 @Entity
 @Table(
-        check = @CheckConstraint(constraint = "buyer_id <> seller_id"),
         uniqueConstraints = @UniqueConstraint(columnNames = {"artwork_id", "buyer_id"}),
-        indexes = {
-                @Index(name = "idx_chat_seller_id", columnList = "seller_id"),
-                @Index(name = "idx_chat_buyer_id", columnList = "buyer_id")
-        }
+        indexes = @Index(name = "idx_chat_buyer_id", columnList = "buyer_id")
 )
 @Getter
 @Setter
@@ -43,11 +39,6 @@ public class Chat {
     @JoinColumn(name = "buyer_id", nullable = false)
     @OnDelete(action = OnDeleteAction.CASCADE)
     private User buyer;
-
-    @ManyToOne
-    @JoinColumn(name = "seller_id", nullable = false)
-    @OnDelete(action = OnDeleteAction.CASCADE)
-    private User seller;
 
     @Column(updatable = false)
     @CreationTimestamp
