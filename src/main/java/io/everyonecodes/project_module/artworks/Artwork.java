@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
+@Table(indexes = @Index(name = "idx_artwork_artist_id", columnList = "artist_id"))
 @Getter
 @Setter
 @AllArgsConstructor
