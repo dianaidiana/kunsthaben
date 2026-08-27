@@ -47,8 +47,12 @@ public final class ErrorMessages {
     public static final String DUPLICATE_FOLLOW = "Follow already exists";
 
     public static final String INVALID_CREDENTIALS = "Invalid credentials";
-    public static final String INVALID_TOKEN = "invalid token";
 
     public static final String CONTENT_REQUIRED = "Message content can't be empty";
     public static final String MAX_CHARACTERS = "The message exceeds the maximum of characters allowed";
+
+    public static final String CHAT_NOT_FOUND = "Chat not found";
+    public static final String NOT_CHAT_PARTICIPANT = "You do not have permission to access this chat";
+    public static final String CANNOT_CHAT_WITH_SELF = "You can't chat with yourself";
+    public static final String NO_MESSAGES = "This chat has no messages";
 }
