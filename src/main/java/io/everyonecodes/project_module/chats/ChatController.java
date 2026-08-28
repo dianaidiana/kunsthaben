@@ -32,7 +32,7 @@ public class ChatController {
 
     @GetMapping("/chat")
     Slice<ChatSummaryResponse> getAllChatsByParticipant(@AuthenticationPrincipal AuthPrincipal authPrincipal,
-                                                        @PageableDefault(size = 20, sort = "createdAt", direction =
+                                                        @PageableDefault(size = 20, sort = "lastMessageAt", direction =
                                                                 Sort.Direction.DESC) Pageable pageable) {
         return service.getAllChatsByParticipant(authPrincipal.id(), pageable);
     }

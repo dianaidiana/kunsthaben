@@ -40,6 +40,8 @@ public class Chat {
     @CreationTimestamp
     private OffsetDateTime createdAt;
 
+    private OffsetDateTime lastMessageAt;
+
     @Column(columnDefinition = "BOOLEAN DEFAULT true")
     private boolean active;
 }

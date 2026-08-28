@@ -45,13 +45,15 @@ public class ChatService {
             var chat = oChat.get();
             var newMessage = new Message(null, chat, buyer, messageRequest.getContent(), false, null);
             messageRepository.save(newMessage);
+            chat.setLastMessageAt(newMessage.getCreatedAt());
             return ChatSummaryResponse.from(chat, newMessage, buyerId);
         }
 
-        var newChat = new Chat(null, artwork, buyer, null, true);
+        var newChat = new Chat(null, artwork, buyer, null, null, true);
         var newMessage = new Message(null, newChat, buyer, messageRequest.getContent(), false, null);
         chatRepository.save(newChat);
         messageRepository.save(newMessage);
+        newChat.setLastMessageAt(newMessage.getCreatedAt());
 
         return ChatSummaryResponse.from(newChat, newMessage, buyerId);
     }
@@ -78,6 +80,7 @@ public class ChatService {
         var sender = chat.getBuyer().getId().equals(senderId) ? chat.getBuyer() : chat.getArtwork().getArtist();
         var newMessage = new Message(null, chat, sender, messageRequest.getContent(), false, null);
         messageRepository.save(newMessage);
+        chat.setLastMessageAt(newMessage.getCreatedAt());
         return MessageResponse.from(newMessage);
     }
 
