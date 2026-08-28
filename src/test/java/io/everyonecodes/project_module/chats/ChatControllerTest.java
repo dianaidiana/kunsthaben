@@ -88,7 +88,7 @@ class ChatControllerTest {
     @Test
     void startChatSuccessfully() {
         var messageRequest = new MessageRequest("Hello!");
-        var chat = new Chat(1L, artwork, buyer, createdAt, true);
+        var chat = new Chat(1L, artwork, buyer, createdAt, createdAt, true);
         var message = new Message(1L, chat, buyer, messageRequest.getContent(), false, createdAt);
         var expected = ChatSummaryResponse.from(chat, message, buyer.getId());
         when(service.startChat(artwork.getId(), buyer.getId(), messageRequest)).thenReturn(expected);
@@ -135,7 +135,7 @@ class ChatControllerTest {
 
     @Test
     void getAllChatsByParticipantSuccessfully() {
-        var chat = new Chat(1L, artwork, buyer, createdAt, true);
+        var chat = new Chat(1L, artwork, buyer, createdAt, createdAt, true);
         var message = new Message(1L, chat, buyer, "Hello!", false, createdAt);
         when(service.getAllChatsByParticipant(eq(2L), any()))
                 .thenReturn(new SliceImpl<>(List.of(ChatSummaryResponse.from(chat, message, buyer.getId()))));
