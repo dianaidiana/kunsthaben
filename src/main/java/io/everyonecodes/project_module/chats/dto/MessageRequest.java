@@ -12,7 +12,7 @@ import lombok.Setter;
 @Getter
 @Setter
 @EqualsAndHashCode
-public class SendMessageRequest {
+public class MessageRequest {
 
     @NotBlank(message = ErrorMessages.CONTENT_REQUIRED)
     @Size(max = 1000, message = ErrorMessages.MAX_CHARACTERS)

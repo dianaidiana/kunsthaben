@@ -3,6 +3,7 @@ package io.everyonecodes.project_module.chats;
 import io.everyonecodes.project_module.artworks.ArtworkService;
 import io.everyonecodes.project_module.chats.dto.ChatSummaryResponse;
 import io.everyonecodes.project_module.chats.dto.MessageResponse;
+import io.everyonecodes.project_module.chats.dto.MessageRequest;
 import io.everyonecodes.project_module.exceptions.BadRequestException;
 import io.everyonecodes.project_module.exceptions.ErrorMessages;
 import io.everyonecodes.project_module.exceptions.ForbiddenException;
@@ -32,7 +33,7 @@ public class ChatService {
     }
 
     @Transactional
-    public ChatSummaryResponse startChat(Long artworkId, Long buyerId, String content) {
+    public ChatSummaryResponse startChat(Long artworkId, Long buyerId, MessageRequest messageRequest) {
         var buyer = userService.fetchUser(buyerId);
         var artwork = artworkService.fetchArtwork(artworkId);
 
@@ -43,13 +44,13 @@ public class ChatService {
         var oChat = chatRepository.findByArtworkIdAndBuyerId(artworkId, buyerId);
         if (oChat.isPresent()) {
             var chat = oChat.get();
-            var newMessage = new Message(null, chat, buyer, content, false, null);
+            var newMessage = new Message(null, chat, buyer, messageRequest.getContent(), false, null);
             messageRepository.save(newMessage);
             return ChatSummaryResponse.from(chat, newMessage, buyerId);
         }
 
         var newChat = new Chat(null, artwork, buyer, null, true, new ArrayList<>());
-        var newMessage = new Message(null, newChat, buyer, content, false, null);
+        var newMessage = new Message(null, newChat, buyer, messageRequest.getContent(), false, null);
         chatRepository.save(newChat);
         messageRepository.save(newMessage);
 
@@ -74,10 +75,10 @@ public class ChatService {
     }
 
     @Transactional
-    public MessageResponse sendMessage(Long chatId, Long senderId, String content) {
+    public MessageResponse sendMessage(Long chatId, Long senderId, MessageRequest messageRequest) {
         var chat = fetchChatAsParticipant(chatId, senderId);
         var sender = chat.getBuyer().getId().equals(senderId) ? chat.getBuyer() : chat.getArtwork().getArtist();
-        var newMessage = new Message(null, chat, sender, content, false, null);
+        var newMessage = new Message(null, chat, sender, messageRequest.getContent(), false, null);
         messageRepository.save(newMessage);
         return MessageResponse.from(newMessage);
     }
@@ -98,6 +99,4 @@ public class ChatService {
 
         return chat;
     }
-
-
 }
