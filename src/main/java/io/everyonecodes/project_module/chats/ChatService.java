@@ -9,7 +9,6 @@ import io.everyonecodes.project_module.exceptions.ErrorMessages;
 import io.everyonecodes.project_module.exceptions.ForbiddenException;
 import io.everyonecodes.project_module.exceptions.NotFoundException;
 import io.everyonecodes.project_module.users.UserService;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
@@ -49,7 +48,7 @@ public class ChatService {
             return ChatSummaryResponse.from(chat, newMessage, buyerId);
         }
 
-        var newChat = new Chat(null, artwork, buyer, null, true, new ArrayList<>());
+        var newChat = new Chat(null, artwork, buyer, null, true);
         var newMessage = new Message(null, newChat, buyer, messageRequest.getContent(), false, null);
         chatRepository.save(newChat);
         messageRepository.save(newMessage);

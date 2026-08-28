@@ -12,8 +12,6 @@ import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 
 import java.time.OffsetDateTime;
-import java.util.ArrayList;
-import java.util.List;
 
 @Entity
 @Table(
@@ -46,10 +44,5 @@ public class Chat {
 
     @Column(columnDefinition = "BOOLEAN DEFAULT true")
     private boolean active;
-
-    @OneToMany(mappedBy = "chat")
-    @OrderBy("createdAt DESC")
-    private List<Message> messages = new ArrayList<>();
 }
 
-// TODO: user can delete messages?
