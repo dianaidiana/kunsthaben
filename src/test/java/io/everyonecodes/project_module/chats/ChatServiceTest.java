@@ -98,7 +98,7 @@ class ChatServiceTest {
             savedChat.setCreatedAt(createdAt);
             return savedChat;
         });
-        var expectedChat = new Chat(1L, artwork, buyer, createdAt, true);
+        var expectedChat = new Chat(1L, artwork, buyer, createdAt, createdAt, true);
         when(messageRepository.save(any())).thenAnswer(invocation -> {
             Message savedMessage = invocation.getArgument(0);
             savedMessage.setId(1L);
@@ -144,7 +144,7 @@ class ChatServiceTest {
     @Test
     void startChatThatAlreadyExists() {
         var messageRequest = new MessageRequest("Hello!");
-        var chat = new Chat(1L, artwork, buyer, createdAt, true);
+        var chat = new Chat(1L, artwork, buyer, createdAt, createdAt, true);
         when(userService.fetchUser(2L)).thenReturn(buyer);
         when(artworkService.fetchArtwork(1L)).thenReturn(artwork);
         when(chatRepository.findByArtworkIdAndBuyerId(1L, 2L)).thenReturn(Optional.of(chat));
@@ -170,7 +170,7 @@ class ChatServiceTest {
 
     @Test
     void getAllChatsByParticipantWhenParticipantIsBuyer() {
-        var chat = new Chat(1L, artwork, buyer, createdAt, true);
+        var chat = new Chat(1L, artwork, buyer, createdAt, createdAt, true);
         var lastMessage = new Message(1L, chat, buyer, "Hello!", false, createdAt);
 
         when(chatRepository.findByParticipantId(eq(2L), any())).thenReturn(new SliceImpl<>(List.of(chat)));
@@ -184,7 +184,7 @@ class ChatServiceTest {
 
     @Test
     void getAllChatsByParticipantWhenParticipantIsArtist() {
-        var chat = new Chat(1L, artwork, buyer, createdAt, true);
+        var chat = new Chat(1L, artwork, buyer, createdAt, createdAt, true);
         var lastMessage = new Message(1L, chat, buyer, "Hello!", false, createdAt);
 
         when(chatRepository.findByParticipantId(eq(1L), any())).thenReturn(new SliceImpl<>(List.of(chat)));
@@ -207,7 +207,7 @@ class ChatServiceTest {
 
     @Test
     void getMessagesAsBuyer() {
-        var chat = new Chat(1L, artwork, buyer, createdAt, true);
+        var chat = new Chat(1L, artwork, buyer, createdAt, createdAt, true);
         var message = new Message(1L, chat, buyer, "Hello!", false, createdAt);
 
         when(chatRepository.findById(1L)).thenReturn(Optional.of(chat));
@@ -220,7 +220,7 @@ class ChatServiceTest {
 
     @Test
     void getMessagesAsArtist() {
-        var chat = new Chat(1L, artwork, buyer, createdAt, true);
+        var chat = new Chat(1L, artwork, buyer, createdAt, createdAt, true);
         var message = new Message(1L, chat, buyer, "Hello!", false, createdAt);
 
         when(chatRepository.findById(1L)).thenReturn(Optional.of(chat));
@@ -240,7 +240,7 @@ class ChatServiceTest {
 
     @Test
     void getMessagesNotParticipant() {
-        var chat = new Chat(1L, artwork, buyer, createdAt, true);
+        var chat = new Chat(1L, artwork, buyer, createdAt, createdAt, true);
         when(chatRepository.findById(1L)).thenReturn(Optional.of(chat));
 
         assertThrows(ForbiddenException.class, () -> service.getMessages(1L, 99L, PageRequest.of(0, 20)));
@@ -248,7 +248,7 @@ class ChatServiceTest {
 
     @Test
     void sendMessageAsBuyer() {
-        var chat = new Chat(1L, artwork, buyer, createdAt, true);
+        var chat = new Chat(1L, artwork, buyer, createdAt, createdAt, true);
         when(chatRepository.findById(1L)).thenReturn(Optional.of(chat));
         when(messageRepository.save(any())).thenAnswer(invocation -> {
             Message savedMessage = invocation.getArgument(0);
@@ -271,7 +271,7 @@ class ChatServiceTest {
 
     @Test
     void sendMessageAsArtist() {
-        var chat = new Chat(1L, artwork, buyer, createdAt, true);
+        var chat = new Chat(1L, artwork, buyer, createdAt, createdAt, true);
         when(chatRepository.findById(1L)).thenReturn(Optional.of(chat));
         when(messageRepository.save(any())).thenAnswer(invocation -> {
             Message savedMessage = invocation.getArgument(0);
@@ -301,7 +301,7 @@ class ChatServiceTest {
 
     @Test
     void sendMessageNotParticipant() {
-        var chat = new Chat(1L, artwork, buyer, createdAt, true);
+        var chat = new Chat(1L, artwork, buyer, createdAt, createdAt, true);
         when(chatRepository.findById(1L)).thenReturn(Optional.of(chat));
 
         assertThrows(ForbiddenException.class, () -> service.sendMessage(1L, 99L, new MessageRequest("Hi there")));
@@ -310,7 +310,7 @@ class ChatServiceTest {
 
     @Test
     void markReadAsBuyer() {
-        var chat = new Chat(1L, artwork, buyer, createdAt, true);
+        var chat = new Chat(1L, artwork, buyer, createdAt, createdAt, true);
         when(chatRepository.findById(1L)).thenReturn(Optional.of(chat));
 
         service.markRead(1L, 2L);
@@ -320,7 +320,7 @@ class ChatServiceTest {
 
     @Test
     void markReadAsArtist() {
-        var chat = new Chat(1L, artwork, buyer, createdAt, true);
+        var chat = new Chat(1L, artwork, buyer, createdAt, createdAt, true);
         when(chatRepository.findById(1L)).thenReturn(Optional.of(chat));
 
         service.markRead(1L, 1L);
@@ -338,7 +338,7 @@ class ChatServiceTest {
 
     @Test
     void markReadNotParticipant() {
-        var chat = new Chat(1L, artwork, buyer, createdAt, true);
+        var chat = new Chat(1L, artwork, buyer, createdAt, createdAt, true);
         when(chatRepository.findById(1L)).thenReturn(Optional.of(chat));
 
         assertThrows(ForbiddenException.class, () -> service.markRead(1L, 99L));
