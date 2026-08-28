@@ -57,8 +57,7 @@ public class ChatService {
         return ChatSummaryResponse.from(newChat, newMessage, buyerId);
     }
 
-    @Transactional(readOnly = true)
-    public Page<ChatSummaryResponse> getAllChatsByParticipant(Long participantId, Pageable pageable) {
+    public Slice<ChatSummaryResponse> getAllChatsByParticipant(Long participantId, Pageable pageable) {
         var chats = chatRepository.findByParticipantId(participantId, pageable);
         return chats.map(chat ->
                 ChatSummaryResponse.from(chat,
