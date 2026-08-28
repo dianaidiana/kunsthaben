@@ -22,7 +22,7 @@ public class ChatSummaryResponse {
     private String thumbnailUrl;
     private UserResponse otherParticipant;
     private String lastMessage;
-    private OffsetDateTime lastMessageSentAt;
+    private OffsetDateTime lastMessageAt;
     private boolean messageRead;
     private OffsetDateTime createdAt;
 
