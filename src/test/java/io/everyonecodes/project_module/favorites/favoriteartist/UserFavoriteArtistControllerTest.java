@@ -57,7 +57,7 @@ class UserFavoriteArtistControllerTest {
     void saveFavoriteArtistSuccessfully() {
         when(service.saveFavoriteArtist(any(), any())).thenReturn(expectedUser);
 
-        UserResponse response = auth.authenticated(client.post().uri("/user/1/favorite-artist/1"), 1L, "bob@ross.com")
+        UserResponse response = auth.authenticated(client.post().uri("/favorite-artist/1"), 1L, "bob@ross.com")
                                      .exchange()
                                      .expectStatus().isCreated()
                                      .expectBody(UserResponse.class)
@@ -71,7 +71,7 @@ class UserFavoriteArtistControllerTest {
     void saveFavoriteArtistSelfFollow() {
         when(service.saveFavoriteArtist(any(), any())).thenThrow(new BadRequestException(ErrorMessages.SELF_FOLLOW));
 
-        auth.authenticated(client.post().uri("/user/1/favorite-artist/1"), 1L, "bob@ross.com")
+        auth.authenticated(client.post().uri("/favorite-artist/1"), 1L, "bob@ross.com")
             .exchange()
             .expectStatus().isBadRequest();
     }
@@ -80,7 +80,7 @@ class UserFavoriteArtistControllerTest {
     void saveFavoriteArtistUserNotFound() {
         when(service.saveFavoriteArtist(any(), any())).thenThrow(new NotFoundException(ErrorMessages.USER_NOT_FOUND));
 
-        auth.authenticated(client.post().uri("/user/1/favorite-artist/1"), 1L, "bob@ross.com")
+        auth.authenticated(client.post().uri("/favorite-artist/1"), 1L, "bob@ross.com")
             .exchange()
             .expectStatus().isNotFound();
     }
@@ -90,21 +90,14 @@ class UserFavoriteArtistControllerTest {
     void saveFavoriteArtistDuplicate() {
         when(service.saveFavoriteArtist(any(), any())).thenThrow(new ConflictException(ErrorMessages.DUPLICATE_FOLLOW));
 
-        auth.authenticated(client.post().uri("/user/1/favorite-artist/1"), 1L, "bob@ross.com")
+        auth.authenticated(client.post().uri("/favorite-artist/1"), 1L, "bob@ross.com")
             .exchange()
             .expectStatus().isEqualTo(409);
     }
 
     @Test
-    void saveFavoriteArtistAsDifferentUser() {
-        auth.authenticated(client.post().uri("/user/1/favorite-artist/1"), 2L, "someone-else@example.com")
-            .exchange()
-            .expectStatus().isForbidden();
-    }
-
-    @Test
     void deleteFavoriteArtistSuccessfully() {
-        auth.authenticated(client.delete().uri("/user/1/favorite-artist/1"), 1L, "bob@ross.com")
+        auth.authenticated(client.delete().uri("/favorite-artist/1"), 1L, "bob@ross.com")
             .exchange()
             .expectStatus().isNoContent();
 
@@ -112,17 +105,10 @@ class UserFavoriteArtistControllerTest {
     }
 
     @Test
-    void deleteFavoriteArtistAsDifferentUser() {
-        auth.authenticated(client.delete().uri("/user/1/favorite-artist/1"), 2L, "someone-else@example.com")
-            .exchange()
-            .expectStatus().isForbidden();
-    }
-
-    @Test
     void listFavoriteArtists() {
         when(service.listFavoriteArtists(any())).thenReturn(List.of(expectedUser));
 
-        List<UserResponse> response = auth.authenticated(client.get().uri("user/1/favorite-artist"), 1L, "bob@ross.com")
+        List<UserResponse> response = auth.authenticated(client.get().uri("/favorite-artist"), 1L, "bob@ross.com")
                                            .exchange()
                                            .expectStatus().isOk()
                                            .expectBody(new ParameterizedTypeReference<List<UserResponse>>() {
@@ -134,17 +120,10 @@ class UserFavoriteArtistControllerTest {
     }
 
     @Test
-    void listFavoriteArtistsAsDifferentUser() {
-        auth.authenticated(client.get().uri("user/1/favorite-artist"), 2L, "someone-else@example.com")
-            .exchange()
-            .expectStatus().isForbidden();
-    }
-
-    @Test
     void listFavoriteArtistsEmpty() {
         when(service.listFavoriteArtists(any())).thenReturn(List.of());
 
-        List<UserResponse> response = auth.authenticated(client.get().uri("user/1/favorite-artist"), 1L, "bob@ross.com")
+        List<UserResponse> response = auth.authenticated(client.get().uri("/favorite-artist"), 1L, "bob@ross.com")
                                            .exchange()
                                            .expectStatus().isOk()
                                            .expectBody(new ParameterizedTypeReference<List<UserResponse>>() {

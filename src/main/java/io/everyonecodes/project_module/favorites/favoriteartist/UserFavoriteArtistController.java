@@ -1,8 +1,6 @@
 package io.everyonecodes.project_module.favorites.favoriteartist;
 
 import io.everyonecodes.project_module.auth.AuthPrincipal;
-import io.everyonecodes.project_module.exceptions.ErrorMessages;
-import io.everyonecodes.project_module.exceptions.ForbiddenException;
 import io.everyonecodes.project_module.users.dto.UserResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -20,32 +18,21 @@ public class UserFavoriteArtistController {
     }
 
     @ResponseStatus(HttpStatus.CREATED)
-    @PostMapping("/user/{userId}/favorite-artist/{artistId}")
-    UserResponse saveFavoriteArtist(@PathVariable Long userId,
-                                    @PathVariable Long artistId,
+    @PostMapping("/favorite-artist/{artistId}")
+    UserResponse saveFavoriteArtist(@PathVariable Long artistId,
                                     @AuthenticationPrincipal AuthPrincipal authPrincipal) {
-        throwForbiddenIfNotOwned(authPrincipal, userId);
-        return service.saveFavoriteArtist(userId, artistId);
+        return service.saveFavoriteArtist(authPrincipal.id(), artistId);
     }
 
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @DeleteMapping("/user/{userId}/favorite-artist/{artistId}")
-    void deleteFavoriteArtist(@PathVariable Long userId,
-                              @PathVariable Long artistId,
+    @DeleteMapping("/favorite-artist/{artistId}")
+    void deleteFavoriteArtist(@PathVariable Long artistId,
                               @AuthenticationPrincipal AuthPrincipal authPrincipal) {
-        throwForbiddenIfNotOwned(authPrincipal, userId);
-        service.deleteFavoriteArtist(userId, artistId);
+        service.deleteFavoriteArtist(authPrincipal.id(), artistId);
     }
 
-    @GetMapping("/user/{userId}/favorite-artist")
-    List<UserResponse> listFavoriteArtists(@PathVariable Long userId, @AuthenticationPrincipal AuthPrincipal authPrincipal) {
-        throwForbiddenIfNotOwned(authPrincipal, userId);
-        return service.listFavoriteArtists(userId);
-    }
-
-    private void throwForbiddenIfNotOwned(AuthPrincipal principal, Long userId) {
-        if (!principal.id().equals(userId)) {
-            throw new ForbiddenException(ErrorMessages.NOT_PROFILE_OWNER);
-        }
+    @GetMapping("/favorite-artist")
+    List<UserResponse> listFavoriteArtists(@AuthenticationPrincipal AuthPrincipal authPrincipal) {
+        return service.listFavoriteArtists(authPrincipal.id());
     }
 }
