@@ -7,7 +7,6 @@ import io.everyonecodes.project_module.artworks.dto.ArtworkUpdateRequest;
 import io.everyonecodes.project_module.artworks.filters.ArtworkFilter;
 import io.everyonecodes.project_module.auth.AuthPrincipal;
 import io.everyonecodes.project_module.exceptions.ErrorMessages;
-import io.everyonecodes.project_module.exceptions.ForbiddenException;
 import io.everyonecodes.project_module.exceptions.NotFoundException;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Pageable;
@@ -60,51 +59,36 @@ public class ArtworkController {
     }
 
     @ResponseStatus(HttpStatus.CREATED)
-    @PostMapping("/user/{artistId}/artwork")
-    ArtworkDetailResponse create(@PathVariable Long artistId,
-                                 @AuthenticationPrincipal AuthPrincipal authPrincipal,
+    @PostMapping("/artwork")
+    ArtworkDetailResponse create(@AuthenticationPrincipal AuthPrincipal authPrincipal,
                                  @Valid @RequestBody ArtworkCreateRequest request) {
-        throwForbiddenIfNotOwned(authPrincipal, artistId);
-        return service.create(artistId, request);
+        return service.create(authPrincipal.id(), request);
     }
 
-    @PutMapping("/user/{artistId}/artwork/{artworkId}")
-    ArtworkDetailResponse update(@PathVariable Long artistId,
-                                 @PathVariable Long artworkId,
+    @PutMapping("/artwork/{artworkId}")
+    ArtworkDetailResponse update(@PathVariable Long artworkId,
                                  @AuthenticationPrincipal AuthPrincipal authPrincipal,
                                  @Valid @RequestBody ArtworkUpdateRequest request) {
-        throwForbiddenIfNotOwned(authPrincipal, artistId);
-        return service.update(artistId, artworkId, request);
+        return service.update(authPrincipal.id(), artworkId, request);
     }
 
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @DeleteMapping("/user/{artistId}/artwork/{artworkId}")
-    void delete(@PathVariable Long artistId, @PathVariable Long artworkId, @AuthenticationPrincipal AuthPrincipal authPrincipal) {
-        throwForbiddenIfNotOwned(authPrincipal, artistId);
-        service.delete(artistId, artworkId);
+    @DeleteMapping("/artwork/{artworkId}")
+    void delete(@PathVariable Long artworkId, @AuthenticationPrincipal AuthPrincipal authPrincipal) {
+        service.delete(authPrincipal.id(), artworkId);
     }
 
-    @PatchMapping("/user/{artistId}/artwork/{artworkId}/reserved")
-    ArtworkDetailResponse markReserved(@PathVariable Long artistId,
-                                       @PathVariable Long artworkId,
+    @PatchMapping("/artwork/{artworkId}/reserved")
+    ArtworkDetailResponse markReserved(@PathVariable Long artworkId,
                                        @AuthenticationPrincipal AuthPrincipal authPrincipal,
                                        @RequestParam boolean reserved) {
-        throwForbiddenIfNotOwned(authPrincipal, artistId);
-        return service.markReserved(artistId, artworkId, reserved);
+        return service.markReserved(authPrincipal.id(), artworkId, reserved);
     }
 
-    @PatchMapping("/user/{artistId}/artwork/{artworkId}/sold")
-    ArtworkDetailResponse markSold(@PathVariable Long artistId,
-                                   @PathVariable Long artworkId,
+    @PatchMapping("/artwork/{artworkId}/sold")
+    ArtworkDetailResponse markSold(@PathVariable Long artworkId,
                                    @AuthenticationPrincipal AuthPrincipal authPrincipal,
                                    @RequestParam boolean sold) {
-        throwForbiddenIfNotOwned(authPrincipal, artistId);
-        return service.markSold(artistId, artworkId, sold);
-    }
-
-    private void throwForbiddenIfNotOwned(AuthPrincipal principal, Long artistId) {
-        if (!principal.id().equals(artistId)) {
-            throw new ForbiddenException(ErrorMessages.NOT_ARTWORK_OWNER);
-        }
+        return service.markSold(authPrincipal.id(), artworkId, sold);
     }
 }

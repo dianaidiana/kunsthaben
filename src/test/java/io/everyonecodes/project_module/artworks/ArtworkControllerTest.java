@@ -169,7 +169,7 @@ class ArtworkControllerTest {
         when(service.create(eq(1L), any())).thenReturn(expectedDetail);
 
         ArtworkDetailResponse response = auth.authenticated(
-                client.post().uri("/user/1/artwork").contentType(MediaType.APPLICATION_JSON).body(createRequest),
+                client.post().uri("/artwork").contentType(MediaType.APPLICATION_JSON).body(createRequest),
                 1L, "bob@ross.com")
                 .exchange()
                 .expectStatus().isCreated()
@@ -185,19 +185,10 @@ class ArtworkControllerTest {
         when(service.create(eq(1L), any())).thenThrow(new NotFoundException(ErrorMessages.USER_NOT_FOUND));
 
         auth.authenticated(
-                client.post().uri("/user/1/artwork").contentType(MediaType.APPLICATION_JSON).body(createRequest),
+                client.post().uri("/artwork").contentType(MediaType.APPLICATION_JSON).body(createRequest),
                 1L, "bob@ross.com")
                 .exchange()
                 .expectStatus().isNotFound();
-    }
-
-    @Test
-    void createAsDifferentArtist() {
-        auth.authenticated(
-                client.post().uri("/user/1/artwork").contentType(MediaType.APPLICATION_JSON).body(createRequest),
-                2L, "someone-else@example.com")
-                .exchange()
-                .expectStatus().isForbidden();
     }
 
     @Test
@@ -205,7 +196,7 @@ class ArtworkControllerTest {
         when(service.update(eq(1L), eq(1L), any())).thenReturn(expectedDetail);
 
         ArtworkDetailResponse response = auth.authenticated(
-                client.put().uri("/user/1/artwork/1").contentType(MediaType.APPLICATION_JSON).body(updateRequest),
+                client.put().uri("/artwork/1").contentType(MediaType.APPLICATION_JSON).body(updateRequest),
                 1L, "bob@ross.com")
                 .exchange()
                 .expectStatus().isOk()
@@ -221,24 +212,15 @@ class ArtworkControllerTest {
         when(service.update(eq(1L), eq(1L), any())).thenThrow(new ForbiddenException(ErrorMessages.NOT_ARTWORK_OWNER));
 
         auth.authenticated(
-                client.put().uri("/user/1/artwork/1").contentType(MediaType.APPLICATION_JSON).body(updateRequest),
+                client.put().uri("/artwork/1").contentType(MediaType.APPLICATION_JSON).body(updateRequest),
                 1L, "bob@ross.com")
                 .exchange()
                 .expectStatus().isForbidden();
     }
 
     @Test
-    void updateAsDifferentArtist() {
-        auth.authenticated(
-                client.put().uri("/user/1/artwork/1").contentType(MediaType.APPLICATION_JSON).body(updateRequest),
-                2L, "someone-else@example.com")
-                .exchange()
-                .expectStatus().isForbidden();
-    }
-
-    @Test
     void deleteSuccessfully() {
-        auth.authenticated(client.delete().uri("/user/1/artwork/1"), 1L, "bob@ross.com")
+        auth.authenticated(client.delete().uri("/artwork/1"), 1L, "bob@ross.com")
             .exchange()
             .expectStatus().isNoContent();
 
@@ -249,16 +231,9 @@ class ArtworkControllerTest {
     void deleteUnexistentArtwork() {
         doThrow(new NotFoundException(ErrorMessages.ARTWORK_NOT_FOUND)).when(service).delete(1L, 1L);
 
-        auth.authenticated(client.delete().uri("/user/1/artwork/1"), 1L, "bob@ross.com")
+        auth.authenticated(client.delete().uri("/artwork/1"), 1L, "bob@ross.com")
             .exchange()
             .expectStatus().isNotFound();
-    }
-
-    @Test
-    void deleteAsDifferentArtist() {
-        auth.authenticated(client.delete().uri("/user/1/artwork/1"), 2L, "someone-else@example.com")
-            .exchange()
-            .expectStatus().isForbidden();
     }
 
     @Test
@@ -266,7 +241,7 @@ class ArtworkControllerTest {
         when(service.markReserved(eq(1L), eq(1L), eq(true))).thenReturn(expectedDetail);
 
         ArtworkDetailResponse response = auth.authenticated(
-                client.patch().uri("/user/1/artwork/1/reserved?reserved={reserved}", true),
+                client.patch().uri("/artwork/1/reserved?reserved={reserved}", true),
                 1L, "bob@ross.com")
                 .exchange()
                 .expectStatus().isOk()
@@ -275,15 +250,6 @@ class ArtworkControllerTest {
                 .getResponseBody();
 
         assertEquals(expectedDetail, response);
-    }
-
-    @Test
-    void markReservedAsDifferentArtist() {
-        auth.authenticated(
-                client.patch().uri("/user/1/artwork/1/reserved?reserved={reserved}", true),
-                2L, "someone-else@example.com")
-                .exchange()
-                .expectStatus().isForbidden();
     }
 
     @Test
@@ -291,7 +257,7 @@ class ArtworkControllerTest {
         when(service.markSold(eq(1L), eq(1L), eq(true))).thenReturn(expectedDetail);
 
         ArtworkDetailResponse response = auth.authenticated(
-                client.patch().uri("/user/1/artwork/1/sold?sold={sold}", true),
+                client.patch().uri("/artwork/1/sold?sold={sold}", true),
                 1L, "bob@ross.com")
                 .exchange()
                 .expectStatus().isOk()
@@ -300,14 +266,5 @@ class ArtworkControllerTest {
                 .getResponseBody();
 
         assertEquals(expectedDetail, response);
-    }
-
-    @Test
-    void markSoldAsDifferentArtist() {
-        auth.authenticated(
-                client.patch().uri("/user/1/artwork/1/sold?sold={sold}", true),
-                2L, "someone-else@example.com")
-                .exchange()
-                .expectStatus().isForbidden();
     }
 }
