@@ -131,7 +131,7 @@ public class UserControllerTest {
         when(service.update(eq(1L), any())).thenReturn(expectedUserWithBio);
 
         UserResponse response = auth.authenticated(
-                client.put().uri("/user/1").contentType(MediaType.APPLICATION_JSON).body(request),
+                client.put().uri("/user").contentType(MediaType.APPLICATION_JSON).body(request),
                 1L, "bob@ross.com")
                 .exchange()
                 .expectStatus().isOk()
@@ -147,22 +147,10 @@ public class UserControllerTest {
         when(service.update(eq(1L), any())).thenThrow(new NotFoundException(ErrorMessages.USER_NOT_FOUND));
 
         auth.authenticated(
-                client.put().uri("/user/1").contentType(MediaType.APPLICATION_JSON).body(request),
+                client.put().uri("/user").contentType(MediaType.APPLICATION_JSON).body(request),
                 1L, "bob@ross.com")
                 .exchange()
                 .expectStatus().isNotFound();
-    }
-
-    @Test
-    void updateNotOwnedProfile() {
-        var request = new UserUpdateRequest("Bob Ross", "Vienna", "1020", "Updated bio");
-        when(service.update(eq(1L), any())).thenThrow(new NotFoundException(ErrorMessages.USER_NOT_FOUND));
-
-        auth.authenticated(
-                client.put().uri("/user/1").contentType(MediaType.APPLICATION_JSON).body(request),
-                2L, "bob@ross.com")
-                .exchange()
-                .expectStatus().isForbidden();
     }
 
     @Test
@@ -173,7 +161,7 @@ public class UserControllerTest {
         when(service.updateAvatar(eq(1L), any())).thenReturn(expectedUserWithAvatar);
 
         UserResponse response = auth.authenticated(
-                client.put().uri("/user/1/avatar").contentType(MediaType.MULTIPART_FORM_DATA).body(builder.build()),
+                client.put().uri("/user/avatar").contentType(MediaType.MULTIPART_FORM_DATA).body(builder.build()),
                 1L, "bob@ross.com")
                 .exchange()
                 .expectStatus().isOk()
@@ -189,21 +177,10 @@ public class UserControllerTest {
         when(service.updateAvatar(eq(1L), any())).thenThrow(new NotFoundException(ErrorMessages.USER_NOT_FOUND));
 
         auth.authenticated(
-                client.put().uri("/user/1/avatar").contentType(MediaType.MULTIPART_FORM_DATA).body(builder.build()),
+                client.put().uri("/user/avatar").contentType(MediaType.MULTIPART_FORM_DATA).body(builder.build()),
                 1L, "bob@ross.com")
                 .exchange()
                 .expectStatus().isNotFound();
-    }
-
-    @Test
-    void updateAvatarNotOwnedProfile() {
-        addFilePart("avatar.jpg");
-
-        auth.authenticated(
-                client.put().uri("/user/1/avatar").contentType(MediaType.MULTIPART_FORM_DATA).body(builder.build()),
-                2L, "bob@ross.com")
-                .exchange()
-                .expectStatus().isForbidden();
     }
 
     @Test
@@ -214,7 +191,7 @@ public class UserControllerTest {
         when(service.updateBanner(eq(1L), any())).thenReturn(expectedUserWithBanner);
 
         UserResponse response = auth.authenticated(
-                client.put().uri("/user/1/banner").contentType(MediaType.MULTIPART_FORM_DATA).body(builder.build()),
+                client.put().uri("/user/banner").contentType(MediaType.MULTIPART_FORM_DATA).body(builder.build()),
                 1L, "bob@ross.com")
                 .exchange()
                 .expectStatus().isOk()
@@ -230,26 +207,15 @@ public class UserControllerTest {
         when(service.updateBanner(eq(1L), any())).thenThrow(new NotFoundException(ErrorMessages.USER_NOT_FOUND));
 
         auth.authenticated(
-                client.put().uri("/user/1/banner").contentType(MediaType.MULTIPART_FORM_DATA).body(builder.build()),
+                client.put().uri("/user/banner").contentType(MediaType.MULTIPART_FORM_DATA).body(builder.build()),
                 1L, "bob@ross.com")
                 .exchange()
                 .expectStatus().isNotFound();
     }
 
     @Test
-    void updateBannerNotOwnedProfile() {
-        addFilePart("banner.jpg");
-
-        auth.authenticated(
-                client.put().uri("/user/1/banner").contentType(MediaType.MULTIPART_FORM_DATA).body(builder.build()),
-                2L, "bob@ross.com")
-                .exchange()
-                .expectStatus().isForbidden();
-    }
-
-    @Test
     void deleteAvatarSuccessfully() {
-        auth.authenticated(client.delete().uri("/user/1/avatar"), 1L, "bob@ross.com")
+        auth.authenticated(client.delete().uri("/user/avatar"), 1L, "bob@ross.com")
                 .exchange()
                 .expectStatus().isNoContent();
 
@@ -261,21 +227,14 @@ public class UserControllerTest {
         org.mockito.Mockito.doThrow(new NotFoundException(ErrorMessages.USER_NOT_FOUND))
                            .when(service).deleteAvatar(1L);
 
-        auth.authenticated(client.delete().uri("/user/1/avatar"), 1L, "bob@ross.com")
+        auth.authenticated(client.delete().uri("/user/avatar"), 1L, "bob@ross.com")
                 .exchange()
                 .expectStatus().isNotFound();
     }
 
     @Test
-    void deleteAvatarNotOwnedProfile() {
-        auth.authenticated(client.delete().uri("/user/1/avatar"), 2L, "bob@ross.com")
-                .exchange()
-                .expectStatus().isForbidden();
-    }
-
-    @Test
     void deleteBannerSuccessfully() {
-        auth.authenticated(client.delete().uri("/user/1/banner"), 1L, "bob@ross.com")
+        auth.authenticated(client.delete().uri("/user/banner"), 1L, "bob@ross.com")
                 .exchange()
                 .expectStatus().isNoContent();
 
@@ -287,21 +246,14 @@ public class UserControllerTest {
         org.mockito.Mockito.doThrow(new NotFoundException(ErrorMessages.USER_NOT_FOUND))
                            .when(service).deleteBanner(1L);
 
-        auth.authenticated(client.delete().uri("/user/1/banner"), 1L, "bob@ross.com")
+        auth.authenticated(client.delete().uri("/user/banner"), 1L, "bob@ross.com")
                 .exchange()
                 .expectStatus().isNotFound();
     }
 
     @Test
-    void deleteBannerNotOwnedProfile() {
-        auth.authenticated(client.delete().uri("/user/1/banner"), 2L, "bob@ross.com")
-                .exchange()
-                .expectStatus().isForbidden();
-    }
-
-    @Test
     void deleteSuccessfully() {
-        auth.authenticated(client.delete().uri("/user/1"), 1L, "bob@ross.com")
+        auth.authenticated(client.delete().uri("/user"), 1L, "bob@ross.com")
                 .exchange()
                 .expectStatus().isNoContent();
 
@@ -313,16 +265,9 @@ public class UserControllerTest {
         org.mockito.Mockito.doThrow(new NotFoundException(ErrorMessages.USER_NOT_FOUND))
                            .when(service).delete(1L);
 
-        auth.authenticated(client.delete().uri("/user/1"), 1L, "bob@ross.com")
+        auth.authenticated(client.delete().uri("/user"), 1L, "bob@ross.com")
                 .exchange()
                 .expectStatus().isNotFound();
-    }
-
-    @Test
-    void deleteNotOwnedProfile() {
-        auth.authenticated(client.delete().uri("/user/1"), 2L, "bob@ross.com")
-                .exchange()
-                .expectStatus().isForbidden();
     }
 
 }

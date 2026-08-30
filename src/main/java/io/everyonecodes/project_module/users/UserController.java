@@ -4,7 +4,6 @@ import io.everyonecodes.project_module.auth.AuthCookieService;
 import io.everyonecodes.project_module.auth.AuthPrincipal;
 import io.everyonecodes.project_module.auth.AuthService;
 import io.everyonecodes.project_module.exceptions.ErrorMessages;
-import io.everyonecodes.project_module.exceptions.ForbiddenException;
 import io.everyonecodes.project_module.exceptions.NotFoundException;
 import io.everyonecodes.project_module.users.dto.UserRegisterRequest;
 import io.everyonecodes.project_module.users.dto.UserResponse;
@@ -44,54 +43,39 @@ public class UserController {
                           .orElseThrow(() -> new NotFoundException(ErrorMessages.USER_NOT_FOUND));
     }
 
-    @PutMapping("/user/{id}")
-    UserResponse update(@PathVariable Long id,
-                        @AuthenticationPrincipal AuthPrincipal principal,
+    @PutMapping("/user")
+    UserResponse update(@AuthenticationPrincipal AuthPrincipal principal,
                         @Valid @RequestBody UserUpdateRequest updateRequest) {
-        throwForbiddenIfNotOwned(principal, id);
-        return userService.update(id, updateRequest);
+        return userService.update(principal.id(), updateRequest);
     }
 
-    @PutMapping(path = "/user/{id}/avatar", consumes = "multipart/form-data")
-    UserResponse updateAvatar(@PathVariable Long id,
-                              @AuthenticationPrincipal AuthPrincipal principal,
+    @PutMapping(path = "/user/avatar", consumes = "multipart/form-data")
+    UserResponse updateAvatar(@AuthenticationPrincipal AuthPrincipal principal,
                               @RequestParam("file") MultipartFile file) {
-        throwForbiddenIfNotOwned(principal, id);
-        return userService.updateAvatar(id, file);
+        return userService.updateAvatar(principal.id(), file);
     }
 
-    @PutMapping(path = "/user/{id}/banner", consumes = "multipart/form-data")
-    UserResponse updateBanner(@PathVariable Long id,
-                              @AuthenticationPrincipal AuthPrincipal principal,
+    @PutMapping(path = "/user/banner", consumes = "multipart/form-data")
+    UserResponse updateBanner(@AuthenticationPrincipal AuthPrincipal principal,
                               @RequestParam("file") MultipartFile file) {
-        throwForbiddenIfNotOwned(principal, id);
-        return userService.updateBanner(id, file);
+        return userService.updateBanner(principal.id(), file);
     }
 
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @DeleteMapping("/user/{id}/avatar")
-    void deleteAvatar(@PathVariable Long id, @AuthenticationPrincipal AuthPrincipal principal) {
-        throwForbiddenIfNotOwned(principal, id);
-        userService.deleteAvatar(id);
+    @DeleteMapping("/user/avatar")
+    void deleteAvatar(@AuthenticationPrincipal AuthPrincipal principal) {
+        userService.deleteAvatar(principal.id());
     }
 
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @DeleteMapping("/user/{id}/banner")
-    void deleteBanner(@PathVariable Long id, @AuthenticationPrincipal AuthPrincipal principal) {
-        throwForbiddenIfNotOwned(principal, id);
-        userService.deleteBanner(id);
+    @DeleteMapping("/user/banner")
+    void deleteBanner(@AuthenticationPrincipal AuthPrincipal principal) {
+        userService.deleteBanner(principal.id());
     }
 
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @DeleteMapping("/user/{id}")
-    void delete(@PathVariable Long id, @AuthenticationPrincipal AuthPrincipal principal) {
-        throwForbiddenIfNotOwned(principal, id);
-        userService.delete(id);
-    }
-
-    private void throwForbiddenIfNotOwned(AuthPrincipal principal, Long id) {
-        if (!principal.id().equals(id)) {
-            throw new ForbiddenException(ErrorMessages.NOT_PROFILE_OWNER);
-        }
+    @DeleteMapping("/user")
+    void delete(@AuthenticationPrincipal AuthPrincipal principal) {
+        userService.delete(principal.id());
     }
 }
