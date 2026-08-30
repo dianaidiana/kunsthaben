@@ -77,7 +77,7 @@ class ArtworkImageControllerTest {
         when(service.addImage(eq(1L), eq(1L), any())).thenReturn(expectedImage);
 
         ArtworkImage response = auth.authenticated(
-                client.post().uri("/user/1/artwork/1/images").contentType(MediaType.MULTIPART_FORM_DATA).body(builder.build()),
+                client.post().uri("/artwork/1/images").contentType(MediaType.MULTIPART_FORM_DATA).body(builder.build()),
                 1L, "bob@ross.com")
                 .exchange()
                 .expectStatus().isCreated()
@@ -107,7 +107,7 @@ class ArtworkImageControllerTest {
         when(service.addImage(eq(1L), eq(1L), any())).thenThrow(new BadRequestException(ErrorMessages.INVALID_IMAGE_FILE));
 
         auth.authenticated(
-                client.post().uri("/user/1/artwork/1/images").contentType(MediaType.MULTIPART_FORM_DATA).body(builder.build()),
+                client.post().uri("/artwork/1/images").contentType(MediaType.MULTIPART_FORM_DATA).body(builder.build()),
                 1L, "bob@ross.com")
                 .exchange()
                 .expectStatus().isBadRequest();
@@ -126,7 +126,7 @@ class ArtworkImageControllerTest {
         when(service.addImage(eq(1L), eq(1L), any())).thenThrow(new NotFoundException(ErrorMessages.ARTWORK_NOT_FOUND));
 
         auth.authenticated(
-                client.post().uri("/user/1/artwork/1/images").contentType(MediaType.MULTIPART_FORM_DATA).body(builder.build()),
+                client.post().uri("/artwork/1/images").contentType(MediaType.MULTIPART_FORM_DATA).body(builder.build()),
                 1L, "bob@ross.com")
                 .exchange()
                 .expectStatus().isNotFound();
@@ -145,25 +145,8 @@ class ArtworkImageControllerTest {
         when(service.addImage(eq(1L), eq(1L), any())).thenThrow(new ForbiddenException(ErrorMessages.NOT_ARTWORK_OWNER));
 
         auth.authenticated(
-                client.post().uri("/user/1/artwork/1/images").contentType(MediaType.MULTIPART_FORM_DATA).body(builder.build()),
+                client.post().uri("/artwork/1/images").contentType(MediaType.MULTIPART_FORM_DATA).body(builder.build()),
                 1L, "bob@ross.com")
-                .exchange()
-                .expectStatus().isForbidden();
-    }
-
-    @Test
-    void addImageAsDifferentArtist() throws IOException {
-        builder.part("file", new ByteArrayResource(file.getBytes()) {
-                   @Override
-                   public String getFilename() {
-                       return file.getOriginalFilename();
-                   }
-               })
-               .contentType(MediaType.IMAGE_JPEG);
-
-        auth.authenticated(
-                client.post().uri("/user/1/artwork/1/images").contentType(MediaType.MULTIPART_FORM_DATA).body(builder.build()),
-                2L, "someone-else@example.com")
                 .exchange()
                 .expectStatus().isForbidden();
     }
@@ -181,7 +164,7 @@ class ArtworkImageControllerTest {
         when(service.addImage(eq(1L), eq(1L), any())).thenThrow(new BadRequestException(ErrorMessages.TOO_MANY_IMAGES));
 
         auth.authenticated(
-                client.post().uri("/user/1/artwork/1/images").contentType(MediaType.MULTIPART_FORM_DATA).body(builder.build()),
+                client.post().uri("/artwork/1/images").contentType(MediaType.MULTIPART_FORM_DATA).body(builder.build()),
                 1L, "bob@ross.com")
                 .exchange()
                 .expectStatus().isBadRequest();
@@ -190,7 +173,7 @@ class ArtworkImageControllerTest {
     @Test
     void reorderImagesSuccessfully() {
         auth.authenticated(
-                client.put().uri("/user/1/artwork/1/images/reorder").contentType(MediaType.APPLICATION_JSON).body(List.of(2L, 1L)),
+                client.put().uri("/artwork/1/images/reorder").contentType(MediaType.APPLICATION_JSON).body(List.of(2L, 1L)),
                 1L, "bob@ross.com")
                 .exchange()
                 .expectStatus().isNoContent();
@@ -203,17 +186,8 @@ class ArtworkImageControllerTest {
         doThrow(new ForbiddenException(ErrorMessages.NOT_ARTWORK_OWNER)).when(service).reorderImages(eq(1L), eq(1L), any());
 
         auth.authenticated(
-                client.put().uri("/user/1/artwork/1/images/reorder").contentType(MediaType.APPLICATION_JSON).body(List.of(1L)),
+                client.put().uri("/artwork/1/images/reorder").contentType(MediaType.APPLICATION_JSON).body(List.of(1L)),
                 1L, "bob@ross.com")
-                .exchange()
-                .expectStatus().isForbidden();
-    }
-
-    @Test
-    void reorderImagesAsDifferentArtist() {
-        auth.authenticated(
-                client.put().uri("/user/1/artwork/1/images/reorder").contentType(MediaType.APPLICATION_JSON).body(List.of(1L)),
-                2L, "someone-else@example.com")
                 .exchange()
                 .expectStatus().isForbidden();
     }
@@ -223,7 +197,7 @@ class ArtworkImageControllerTest {
         doThrow(new NotFoundException(ErrorMessages.ARTWORK_NOT_FOUND)).when(service).reorderImages(eq(1L), eq(1L), any());
 
         auth.authenticated(
-                client.put().uri("/user/1/artwork/1/images/reorder").contentType(MediaType.APPLICATION_JSON).body(List.of(1L)),
+                client.put().uri("/artwork/1/images/reorder").contentType(MediaType.APPLICATION_JSON).body(List.of(1L)),
                 1L, "bob@ross.com")
                 .exchange()
                 .expectStatus().isNotFound();
@@ -234,7 +208,7 @@ class ArtworkImageControllerTest {
         doThrow(new BadRequestException(ErrorMessages.IMAGES_DO_NOT_MATCH)).when(service).reorderImages(eq(1L), eq(1L), any());
 
         auth.authenticated(
-                client.put().uri("/user/1/artwork/1/images/reorder").contentType(MediaType.APPLICATION_JSON).body(List.of(1L, 3L)),
+                client.put().uri("/artwork/1/images/reorder").contentType(MediaType.APPLICATION_JSON).body(List.of(1L, 3L)),
                 1L, "bob@ross.com")
                 .exchange()
                 .expectStatus().isBadRequest();
@@ -242,7 +216,7 @@ class ArtworkImageControllerTest {
 
     @Test
     void deleteImageSuccessfully() {
-        auth.authenticated(client.delete().uri("/user/1/artwork/1/images/1"), 1L, "bob@ross.com")
+        auth.authenticated(client.delete().uri("/artwork/1/images/1"), 1L, "bob@ross.com")
             .exchange()
             .expectStatus().isNoContent();
 
@@ -253,14 +227,7 @@ class ArtworkImageControllerTest {
     void deleteImageFromNotOwnedArtwork() {
         doThrow(new ForbiddenException(ErrorMessages.NOT_ARTWORK_OWNER)).when(service).deleteImage(1L, 1L, 1L);
 
-        auth.authenticated(client.delete().uri("/user/1/artwork/1/images/1"), 1L, "bob@ross.com")
-            .exchange()
-            .expectStatus().isForbidden();
-    }
-
-    @Test
-    void deleteImageAsDifferentArtist() {
-        auth.authenticated(client.delete().uri("/user/1/artwork/1/images/1"), 2L, "someone-else@example.com")
+        auth.authenticated(client.delete().uri("/artwork/1/images/1"), 1L, "bob@ross.com")
             .exchange()
             .expectStatus().isForbidden();
     }
@@ -269,7 +236,7 @@ class ArtworkImageControllerTest {
     void deleteUnexistentImage() {
         doThrow(new NotFoundException(ErrorMessages.IMAGE_NOT_FOUND)).when(service).deleteImage(1L, 1L, 1L);
 
-        auth.authenticated(client.delete().uri("/user/1/artwork/1/images/1"), 1L, "bob@ross.com")
+        auth.authenticated(client.delete().uri("/artwork/1/images/1"), 1L, "bob@ross.com")
             .exchange()
             .expectStatus().isNotFound();
     }
